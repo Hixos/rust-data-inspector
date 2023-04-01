@@ -27,11 +27,11 @@ impl Signal {
         &self.name
     }
 
-    pub fn time(&self) -> &Vec<f64> {
+    pub fn time(&self) -> &[f64] {
         &self.time
     }
 
-    pub fn data(&self) -> &Vec<f64> {
+    pub fn data(&self) -> &[f64] {
         &self.data
     }
 
