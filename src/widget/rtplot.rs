@@ -64,7 +64,7 @@ impl RTPlot {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui, signal: &Signal) {
+    pub fn show(&mut self, ui: &mut egui::Ui, signal: &Signal) -> egui::Response {
         // ui.memory_mut(writer)
 
         let plot_id = ui.make_persistent_id(self.id_source);
@@ -127,7 +127,7 @@ impl RTPlot {
         }
 
         memory.store(ui.ctx(), plot_id);
-
+        response.response
         // num_points
     }
 
@@ -154,7 +154,6 @@ impl RTPlot {
         if response.hover_pos().is_some() {
             response.ctx.input(|input| {
                 if input.scroll_delta.y != 0f32 {
-                    println!("{}", input.scroll_delta.y / 100f32);
                     memory.auto_axis.y = false;
                     transform.zoom_y(
                         Self::zoom_from_scroll(input.scroll_delta.y),

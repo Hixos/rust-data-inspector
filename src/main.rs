@@ -2,35 +2,44 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use plotter::new_signal_producer;
-use std::time::Instant;
+use rand::Rng;
 use std::sync::mpsc::channel;
-    use std::{thread::JoinHandle};
+use std::time::Instant;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    // Log to stdout (if you run with `RUST_LOG=debug`).
 
-
-    let mut handles: Vec<JoinHandle<()>> = vec![];
     let start = Instant::now();
 
     let (new_sig_sender, new_sig_receiver) = channel();
 
-    for i in 0..2 {
-        // let name = 
-        let (thandle, shandle) = new_signal_producer(
-            String::from("Signal ") + &i.to_string(),
-            10f64,
-            0.25f64,
-            0.123,
-            60f32,
-            Some(start)
+    let mut rng = rand::thread_rng();
+    let mut add_signal = |name: &str| {
+        use std::f64::consts::PI;
+
+        let (_, shandle) = new_signal_producer(
+            String::from(name),
+            rng.gen::<f64>() * 10.0 + 5.0,
+            rng.gen(),
+            rng.gen::<f64>() * PI * 2.0,
+            rng.gen::<f32>() * 100f32 + 2f32,
+            Some(start),
         );
 
-        handles.push(thandle);
         new_sig_sender.send(shandle).unwrap(); // Panic on failure
-    }
+    };
+
+    add_signal("a/b/s1");
+    add_signal("a/b/s2");
+    add_signal("a/b/s3");
+    add_signal("a/c/s1");
+    add_signal("a/c/s2");
+    add_signal("b/s1");
+    add_signal("b/s2");
+    add_signal("b/c/s1");
+    add_signal("s1");
+    add_signal("s2");
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
