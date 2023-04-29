@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::sync::mpsc::Receiver;
 
+use eframe::epaint::ahash::{HashMap, HashMapExt};
 use egui::Rect;
 
+use crate::{PlotLogic, GlobalPlotLogic};
 use crate::layout::{PlotLayout, SignalList};
 use crate::signal_group::{SignalGroup, SignalHandle};
 use crate::{framehistory::FrameHistory, widget::RTPlot};
@@ -12,7 +14,9 @@ pub struct PlotterApp {
     frame_history: FrameHistory,
     num_points: usize,
     test: bool,
-    plot_layout: PlotLayout
+    plot_layout: PlotLayout,
+    plot_logics: HashMap<String, PlotLogic>,
+    global_logic: GlobalPlotLogic,
 }
 
 impl PlotterApp {
@@ -27,7 +31,9 @@ impl PlotterApp {
             frame_history: FrameHistory::default(),
             num_points: 0,
             test: false,
-            plot_layout: PlotLayout::new()
+            plot_layout: PlotLayout::new(),
+            plot_logics: HashMap::new(),
+            global_logic: GlobalPlotLogic::default()
         };
     }
 }
@@ -95,7 +101,6 @@ impl eframe::App for PlotterApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
             self.num_points = 1usize;
-            let sig = self.signals.get_signal("a/b/s1");
 
             self.plot_layout.ui(ui, &self.signals);
 

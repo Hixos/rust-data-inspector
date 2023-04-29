@@ -18,7 +18,7 @@ pub struct SignalHandle {
 pub struct SignalGroup {
     signals: HashMap<String, SignalHandle>,
     receiver: Receiver<SignalHandle>,
-    name_tree: SimpleTree<NameNode>,
+    name_tree: SimpleTree<NameNode>
 }
 
 impl SignalGroup {
@@ -30,7 +30,7 @@ impl SignalGroup {
                 name: "".into(),
                 path: "".into(),
                 is_signal: false,
-            }),
+            })
         }
     }
 
@@ -51,12 +51,37 @@ impl SignalGroup {
         }
     }
 
-    pub fn get_signal(&self, key: &str) -> Option<&Signal> {
-        self.signals.get(key).and_then(|h| Some(&h.signal))
+    pub fn get_signal<S: Into<String>>(&self, key: S) -> Option<&Signal> {
+        self.signals.get(&key.into()).and_then(|h| Some(&h.signal))
     }
 
     pub fn get_tree(&self) -> &SimpleTree<NameNode> {
         &self.name_tree
+    }
+
+    pub fn current_timestamp(&self) -> Option<f64> {
+        let mut max: Option<f64> = None;
+
+        for (_, signal) in &self.signals {
+            let ts = signal.signal.time().last();
+            match ts {
+                Some(ts) => {
+                    match &max {
+                        Some(max_val) => {
+                            if ts > max_val {
+                                max = Some(*ts);
+                            }
+                        }
+                        None => {
+                            max = Some(*ts);
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+
+        max
     }
 
     fn tree_insert(tree: &mut SimpleTree<NameNode>, name: String) -> Result<(), ()> {

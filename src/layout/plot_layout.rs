@@ -78,7 +78,9 @@ impl<'a> egui_dock::TabViewer for PlotTabViewer<'a> {
 
         let sig = tab.signals.iter().next();
         if sig.is_some() {
-            plot.show(ui, self.signals.get_signal(sig.unwrap()).unwrap());
+            plot.show(ui, | plot_ui | {
+                
+            });
         }
     }
 

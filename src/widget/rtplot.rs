@@ -4,7 +4,10 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
-use egui::plot::{Line, Plot, PlotBounds, PlotPoint, PlotPoints};
+use egui::{
+    plot::{Line, Plot, PlotBounds, PlotPoint, PlotPoints, PlotUi},
+    Ui, InnerResponse,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::signal::Signal;
@@ -26,29 +29,17 @@ impl AxisBools {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct RTPlotMemory {
-    dt: f64,
+struct PlotResponse {
     auto_axis: AxisBools,
     next_bounds: Option<egui::plot::PlotBounds>,
 }
 
-impl Default for RTPlotMemory {
+impl Default for PlotResponse {
     fn default() -> Self {
-        RTPlotMemory {
-            dt: 60f64,
-            auto_axis: AxisBools { x: true, y: true },
+        PlotResponse {
+            auto_axis: AxisBools { x: false, y: false },
             next_bounds: None,
         }
-    }
-}
-
-impl RTPlotMemory {
-    pub fn load(ctx: &egui::Context, id: egui::Id) -> Option<Self> {
-        ctx.data_mut(|d| d.get_persisted(id))
-    }
-
-    pub fn store(self, ctx: &egui::Context, id: egui::Id) {
-        ctx.data_mut(|d| d.insert_persisted(id, self));
     }
 }
 
@@ -64,17 +55,17 @@ impl RTPlot {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui, signal: &Signal) -> egui::Response {
-        // ui.memory_mut(writer)
-
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        plot_contents: impl FnOnce(&mut PlotUi),
+    ) -> egui::InnerResponse<PlotResponse> {
         let plot_id = ui.make_persistent_id(self.id_source);
         ui.ctx().check_for_id_clash(
             plot_id,
             egui::Rect::from_min_max(egui::Pos2::ZERO, egui::Pos2::ZERO),
             "RTPlot",
         );
-
-        let mut memory = RTPlotMemory::load(ui.ctx(), plot_id).unwrap_or_default();
 
         let mut transform: Option<ScreenTransform> = None;
 
@@ -83,87 +74,56 @@ impl RTPlot {
             .allow_scroll(false)
             // .allow_zoom(false)
             .show(ui, |plot_ui| {
+                plot_contents(plot_ui);
+
                 // Plot bounds but in screen coordinates
                 let screen_bounds = Self::screen_bounds(plot_ui);
-
-                let mut update_bounds = memory.next_bounds.is_some();
-                let mut bounds = memory.next_bounds.unwrap_or(plot_ui.plot_bounds());
-
-                memory.next_bounds = None;
-
-                let last_point = signal.get_last_sample();
-                if memory.auto_axis.x && last_point.is_some() {
-                    let last_point = last_point.unwrap();
-                    bounds = Self::update_x_bounds(last_point.t - memory.dt, last_point.t, bounds);
-                    update_bounds = true;
-                }
-
-                let points = RTPlot::get_visible_points(signal, &bounds, &screen_bounds);
-
-                // These can be returned by get_visible_points instead of iterating over the points again
-                let min = points.points().iter().map(|p| FloatOrd { 0: p.y }).min();
-                let max = points.points().iter().map(|p| FloatOrd { 0: p.y }).max();
-
-                plot_ui.line(Line::new(points));
-
-                if memory.auto_axis.y && min.is_some() && max.is_some() {
-                    // Add top and bottom margin
-                    bounds = Self::update_y_bounds(
-                        min.unwrap().0 * 1.15f64,
-                        max.unwrap().0 * 1.15f64,
-                        bounds,
-                    );
-                    update_bounds = true;
-                }
-                if update_bounds {
-                    plot_ui.set_plot_bounds(bounds);
-                }
-                transform = Some(ScreenTransform::new(bounds, screen_bounds));
+                transform = Some(ScreenTransform::new(plot_ui.plot_bounds(), screen_bounds));
             });
 
         if transform.is_some() {
             let transform = transform.unwrap();
-            Self::handle_input(&response.response, transform, &mut memory);
-        }
+            let plot_resp = Self::handle_input(&response.response, transform);
 
-        memory.store(ui.ctx(), plot_id);
-        response.response
-        // num_points
+            InnerResponse::new(plot_resp, response.response)
+        }else{
+            InnerResponse::new(PlotResponse::default(), response.response)
+        }
     }
 
-    fn handle_input(
-        response: &egui::Response,
-        mut transform: ScreenTransform,
-        memory: &mut RTPlotMemory,
-    ) {
+    fn handle_input(response: &egui::Response, mut transform: ScreenTransform) -> PlotResponse {
+        let mut plot_resp = PlotResponse::default();
+
         if response.double_clicked() {
-            memory.auto_axis.x = true;
+            plot_resp.auto_axis.x = true;
         }
 
         if response.double_clicked_by(egui::PointerButton::Middle) {
-            memory.auto_axis.y = true;
+            plot_resp.auto_axis.y = true;
         }
 
         if response.dragged_by(egui::PointerButton::Primary)
             || response.dragged_by(egui::PointerButton::Secondary)
         {
-            memory.auto_axis = AxisBools::FALSE;
+            plot_resp.auto_axis = AxisBools::FALSE;
         }
 
         // Hackish way to handle custom zooming behaviour, since egui doesn't allow modyfing user interaction
         if response.hover_pos().is_some() {
             response.ctx.input(|input| {
                 if input.scroll_delta.y != 0f32 {
-                    memory.auto_axis.y = false;
+                    plot_resp.auto_axis.y = false;
                     transform.zoom_y(
                         Self::zoom_from_scroll(input.scroll_delta.y),
                         response.hover_pos().unwrap(),
                     );
 
-                    memory.next_bounds = Some(transform.bounds);
+                    plot_resp.next_bounds = Some(transform.bounds);
                 }
             });
         }
+
+        plot_resp
     }
 
     fn update_x_bounds(
@@ -182,7 +142,7 @@ impl RTPlot {
         PlotBounds::from_min_max([bounds.min()[0], y_min], [bounds.max()[0], y_max])
     }
 
-    fn screen_bounds(plot_ui: &mut egui::plot::PlotUi) -> egui::Rect {
+    pub fn screen_bounds(plot_ui: &mut egui::plot::PlotUi) -> egui::Rect {
         let bounds = plot_ui.plot_bounds();
         // Y axis min/max are swapped since screen-space Y axis is positive downwards
         let topleft = PlotPoint::new(bounds.min()[0], bounds.max()[1]);
@@ -203,59 +163,6 @@ impl RTPlot {
         }
     }
 
-    fn get_visible_points(
-        signal: &Signal,
-        plot_bounds: &PlotBounds,
-        screen_bounds: &egui::Rect,
-    ) -> PlotPoints {
-        // Don't plot every single point on the signal, but perform downsampling in order to improve performance
-        // This can be further improved by 
-        //   - using binary to find the first point instead of linear search
-        //   - using informtion from the previous frame to start the search since the starting points will probably be very close
-
-        if signal.data().len() > 0 {
-            // Goal is only having at most N points per pixel + 1 point outside the horizontal bounds for each side
-            let mut points: Vec<PlotPoint> = Vec::with_capacity(screen_bounds.width() as usize + 2);
-            // Minimum distance between plot points
-            let ppp = plot_bounds.width() / screen_bounds.width() as f64 / 5f64;
-
-            let mut first_index = 0;
-
-            for (i, t) in signal.time().iter().enumerate().rev() {
-                if *t < plot_bounds.min()[0] {
-                    first_index = i;
-                    break;
-                }
-            }
-            points.push(PlotPoint {
-                x: signal.time()[first_index],
-                y: signal.data()[first_index],
-            });
-
-            for i in first_index + 1..signal.time().len() {
-                let x = &signal.time()[i];
-                if *x <= plot_bounds.max()[0] {
-                    if x - points.last().unwrap().x >= ppp {
-                        points.push(PlotPoint {
-                            x: signal.time()[i],
-                            y: signal.data()[i],
-                        })
-                    }
-                } else {
-                    // Insert first point outside of bounds to properly visualize line
-                    points.push(PlotPoint {
-                        x: signal.time()[i],
-                        y: signal.data()[i],
-                    });
-                    break;
-                }
-            }
-
-            PlotPoints::Owned(points)
-        } else {
-            PlotPoints::Owned(vec![])
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -344,7 +251,7 @@ impl Copy for RTPlotPoint {}
 #[derive(Clone)]
 #[allow(non_snake_case)]
 struct TransformMatrix {
-    pub T: [[f64; 2]; 2], 
+    pub T: [[f64; 2]; 2],
 }
 impl Copy for TransformMatrix {}
 

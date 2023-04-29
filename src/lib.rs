@@ -8,8 +8,10 @@ mod layout;
 mod signal;
 mod signal_group;
 mod util;
+mod plotlogic;
 
 pub use plotterapp::PlotterApp;
 pub use producer::new_signal_producer;
 pub use framehistory::FrameHistory;
 pub use signal_group::{SignalGroup, SignalHandle};
+pub use plotlogic::{GlobalPlotLogic, PlotLogic};
