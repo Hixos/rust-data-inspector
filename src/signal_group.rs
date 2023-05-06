@@ -12,12 +12,12 @@ pub struct NameNode {
 
 pub struct SignalHandle {
     pub signal: Signal,
-    pub receiver: Receiver<SignalSample>,
+    pub on_new_sample: Receiver<SignalSample>,
 }
 
 pub struct SignalGroup {
     signals: HashMap<String, SignalHandle>,
-    receiver: Receiver<SignalHandle>,
+    on_new_signal: Receiver<SignalHandle>,
     name_tree: SimpleTree<NameNode>
 }
 
@@ -25,7 +25,7 @@ impl SignalGroup {
     pub fn new(receiver: Receiver<SignalHandle>) -> Self {
         SignalGroup {
             signals: HashMap::new(),
-            receiver,
+            on_new_signal: receiver,
             name_tree: SimpleTree::new(NameNode {
                 name: "".into(),
                 path: "".into(),
@@ -35,7 +35,7 @@ impl SignalGroup {
     }
 
     pub fn update(&mut self) {
-        for handle in self.receiver.try_iter() {
+        for handle in self.on_new_signal.try_iter() {
             let name = handle.signal.name().to_string();
             self.signals.insert(name.clone(), handle);
 
@@ -45,7 +45,7 @@ impl SignalGroup {
         }
 
         for handle in self.signals.values_mut() {
-            for sample in handle.receiver.try_iter() {
+            for sample in handle.on_new_sample.try_iter() {
                 handle.signal.push(sample);
             }
         }

@@ -1,58 +1,88 @@
-use float_ord::FloatOrd;
 use std::{
+    cell::Cell,
     hash::Hash,
     ops::{Add, Div, Mul, Neg, Sub},
+    rc::Rc,
 };
 
 use egui::{
-    plot::{Line, Plot, PlotBounds, PlotPoint, PlotPoints, PlotUi},
-    Ui, InnerResponse,
+    plot::{Plot, PlotBounds, PlotPoint, PlotUi},
+    InnerResponse, Rect, Ui, Vec2,
 };
+
 use serde::{Deserialize, Serialize};
 
-use crate::signal::Signal;
+use crate::util::plothelper::{AxisBounds, PlotHelper};
 
 pub struct RTPlot {
     id_source: egui::Id,
+    x_bounds: Option<AxisBounds>,
+    link_group: Option<LinkedAxisGroup>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct AxisBools {
-    x: bool,
-    y: bool,
-}
-
-impl AxisBools {
-    #[allow(dead_code)]
-    pub const TRUE: Self = Self { x: true, y: true };
-    pub const FALSE: Self = Self { x: false, y: false };
+pub struct PlotResponse {
+    pub interacted: bool,
+    pub new_bounds: Option<PlotBounds>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct PlotResponse {
-    auto_axis: AxisBools,
-    next_bounds: Option<egui::plot::PlotBounds>,
+struct PlotMemory {
+    x_bounds: Option<AxisBounds>,
+    y_bounds: Option<AxisBounds>,
 }
 
-impl Default for PlotResponse {
+impl Default for PlotMemory {
     fn default() -> Self {
-        PlotResponse {
-            auto_axis: AxisBools { x: false, y: false },
-            next_bounds: None,
+        PlotMemory {
+            x_bounds: None,
+            y_bounds: None,
         }
     }
 }
 
-struct RTPlotResponse {
-    num_points: usize,
-    following: bool,
+impl PlotMemory {
+    pub fn load(ctx: &egui::Context, id: egui::Id) -> Option<Self> {
+        ctx.data_mut(|d| d.get_persisted(id))
+    }
+
+    pub fn store(self, ctx: &egui::Context, id: egui::Id) {
+        ctx.data_mut(|d| d.insert_persisted(id, self));
+    }
+}
+
+#[derive(Clone)]
+pub struct LinkedAxisGroup {
+    pub link_x: bool,
+    bounds: Rc<Cell<Option<AxisBounds>>>,
+}
+
+impl LinkedAxisGroup {
+    pub fn new(link_x: bool) -> Self {
+        LinkedAxisGroup {
+            link_x: link_x,
+            bounds: Rc::new(Cell::new(None)),
+        }
+    }
 }
 
 impl RTPlot {
     pub fn new(id_source: impl Hash) -> RTPlot {
         RTPlot {
             id_source: egui::Id::new(id_source),
+            x_bounds: None,
+            link_group: None,
         }
+    }
+
+    pub fn set_x_bounds(&mut self, x_bounds: AxisBounds) -> &mut Self {
+        self.x_bounds = Some(x_bounds);
+        self
+    }
+
+    pub fn link_axis(&mut self, link_group: LinkedAxisGroup) -> &mut Self {
+        self.link_group = Some(link_group);
+        self
     }
 
     pub fn show(
@@ -67,91 +97,127 @@ impl RTPlot {
             "RTPlot",
         );
 
-        let mut transform: Option<ScreenTransform> = None;
+        let mut memory = PlotMemory::load(ui.ctx(), plot_id).unwrap_or_default();
+
+        struct InnerPlotResponse {
+            bounds: PlotBounds,
+            screen_bounds: Rect,
+        }
 
         let response = Plot::new(self.id_source)
             .allow_double_click_reset(false)
             .allow_scroll(false)
-            // .allow_zoom(false)
-            .show(ui, |plot_ui| {
+            .allow_zoom(false)
+            .allow_drag(false)
+            .allow_boxed_zoom(false)
+            .show::<InnerPlotResponse>(ui, |plot_ui| {
+                let mut bounds = plot_ui.plot_bounds();
+                
+                let group_ref = self.link_group.as_ref();
+                
+                if group_ref.is_some() && group_ref.unwrap().link_x {
+                    let x = group_ref.unwrap().bounds.clone();
+                    
+                    if x.get().is_some() {
+                        bounds = PlotHelper::set_x_bounds(x.get().unwrap(), bounds);
+                    }
+                }
+                
+                let orig_bounds = bounds.clone();
+
+                if memory.y_bounds.is_some() {
+                    bounds = PlotHelper::set_y_bounds(memory.y_bounds.unwrap(), bounds);
+                }
+
+                if self.x_bounds.is_some() {
+                    bounds = PlotHelper::set_x_bounds(self.x_bounds.unwrap(), bounds);
+                } else if memory.x_bounds.is_some() {
+                    bounds = PlotHelper::set_x_bounds(memory.x_bounds.unwrap(), bounds);
+                }
+
+                plot_ui.set_plot_bounds(bounds);
+
                 plot_contents(plot_ui);
 
+                // plot_ui.
+
+                if plot_ui.plot_bounds() != orig_bounds && group_ref.is_some() {
+                    group_ref.unwrap().bounds.set(Some(AxisBounds::from_x_bounds(bounds)));
+                }
+
                 // Plot bounds but in screen coordinates
-                let screen_bounds = Self::screen_bounds(plot_ui);
-                transform = Some(ScreenTransform::new(plot_ui.plot_bounds(), screen_bounds));
+                let screen_bounds = PlotHelper::get_screen_bounds(plot_ui);
+
+                InnerPlotResponse {
+                    bounds: plot_ui.plot_bounds(),
+                    screen_bounds,
+                }
             });
 
-        if transform.is_some() {
-            let transform = transform.unwrap();
-            let plot_resp = Self::handle_input(&response.response, transform);
+        let transform = ScreenTransform::new(response.inner.bounds, response.inner.screen_bounds);
+        let plot_resp = Self::handle_input(&response.response, transform);
 
-            InnerResponse::new(plot_resp, response.response)
-        }else{
-            InnerResponse::new(PlotResponse::default(), response.response)
+        match plot_resp.new_bounds {
+            Some(bounds) => {
+                memory.x_bounds = Some(PlotHelper::get_x_bounds(bounds));
+                memory.y_bounds = Some(PlotHelper::get_y_bounds(bounds));
+
+                
+                //  group.bounds.set(Some(PlotHelper::get_x_bounds(bounds)));
+                
+            }
+            None => {
+                memory.x_bounds = None;
+                memory.y_bounds = None;
+            }
         }
+
+        memory.store(ui.ctx(), plot_id);
+
+        InnerResponse::new(plot_resp, response.response)
     }
 
     fn handle_input(response: &egui::Response, mut transform: ScreenTransform) -> PlotResponse {
-        let mut plot_resp = PlotResponse::default();
+        let mut plot_response = PlotResponse {
+            interacted: false,
+            new_bounds: None,
+        };
 
-        if response.double_clicked() {
-            plot_resp.auto_axis.x = true;
-        }
+        let mut handled = false;
 
-        if response.double_clicked_by(egui::PointerButton::Middle) {
-            plot_resp.auto_axis.y = true;
-        }
+        if response.dragged_by(egui::PointerButton::Primary) {
+            plot_response.interacted = true;
 
-        if response.dragged_by(egui::PointerButton::Primary)
-            || response.dragged_by(egui::PointerButton::Secondary)
-        {
-            plot_resp.auto_axis = AxisBools::FALSE;
+            transform.translate(response.drag_delta());
+            handled = true;
         }
 
         // Hackish way to handle custom zooming behaviour, since egui doesn't allow modyfing user interaction
         if response.hover_pos().is_some() {
             response.ctx.input(|input| {
                 if input.scroll_delta.y != 0f32 {
-                    plot_resp.auto_axis.y = false;
+                    plot_response.interacted = true;
                     transform.zoom_y(
                         Self::zoom_from_scroll(input.scroll_delta.y),
                         response.hover_pos().unwrap(),
                     );
-
-                    plot_resp.next_bounds = Some(transform.bounds);
+                    handled = true;
+                }
+                if input.zoom_delta() != 1f32 {
+                    plot_response.interacted = true;
+                    transform.zoom_x(
+                        1f64 / (input.zoom_delta() as f64),
+                        response.hover_pos().unwrap(),
+                    );
+                    handled = true;
                 }
             });
         }
-
-        plot_resp
-    }
-
-    fn update_x_bounds(
-        x_min: f64,
-        x_max: f64,
-        bounds: egui::plot::PlotBounds,
-    ) -> egui::plot::PlotBounds {
-        PlotBounds::from_min_max([x_min, bounds.min()[1]], [x_max, bounds.max()[1]])
-    }
-
-    fn update_y_bounds(
-        y_min: f64,
-        y_max: f64,
-        bounds: egui::plot::PlotBounds,
-    ) -> egui::plot::PlotBounds {
-        PlotBounds::from_min_max([bounds.min()[0], y_min], [bounds.max()[0], y_max])
-    }
-
-    pub fn screen_bounds(plot_ui: &mut egui::plot::PlotUi) -> egui::Rect {
-        let bounds = plot_ui.plot_bounds();
-        // Y axis min/max are swapped since screen-space Y axis is positive downwards
-        let topleft = PlotPoint::new(bounds.min()[0], bounds.max()[1]);
-        let bottomright = PlotPoint::new(bounds.max()[0], bounds.min()[1]);
-
-        egui::Rect {
-            min: plot_ui.screen_from_plot(topleft),
-            max: plot_ui.screen_from_plot(bottomright),
+        if handled {
+            plot_response.new_bounds = Some(transform.bounds);
         }
+
+        plot_response
     }
 
     fn zoom_from_scroll(scroll: f32) -> f64 {
@@ -162,7 +228,6 @@ impl RTPlot {
             ZOOM
         }
     }
-
 }
 
 #[derive(Clone, Debug)]
@@ -203,6 +268,15 @@ impl From<[f64; 2]> for RTPlotPoint {
         RTPlotPoint {
             x: point[0],
             y: point[1],
+        }
+    }
+}
+
+impl From<Vec2> for RTPlotPoint {
+    fn from(point: Vec2) -> Self {
+        RTPlotPoint {
+            x: point.x as f64,
+            y: point.y as f64,
         }
     }
 }
@@ -381,7 +455,16 @@ impl ScreenTransform {
         let min = RTPlotPoint::from(self.bounds.min());
         let min = zoom_factor * (min - hover_pos) + hover_pos;
 
-        self.bounds = egui::plot::PlotBounds::from_min_max(min.into(), max.into())
+        self.bounds = egui::plot::PlotBounds::from_min_max(min.into(), max.into());
+    }
+
+    pub fn translate(&mut self, delta: egui::Vec2) {
+        let delta = self.delta_from_screen(delta);
+
+        let min = RTPlotPoint::from(self.bounds.min()) - delta;
+        let max = RTPlotPoint::from(self.bounds.max()) - delta;
+
+        self.bounds = egui::plot::PlotBounds::from_min_max(min.into(), max.into());
     }
 
     #[allow(dead_code)]
@@ -402,6 +485,13 @@ impl ScreenTransform {
         let y = (pos.y - self.rect.max.y) as f64 * -self.bounds.height()
             / self.rect.height() as f64
             + self.bounds.min()[1];
+
+        RTPlotPoint::new(x, y)
+    }
+
+    pub fn delta_from_screen(&self, delta: egui::Vec2) -> RTPlotPoint {
+        let x = delta.x as f64 * self.bounds.width() / self.rect.width() as f64;
+        let y = delta.y as f64 * -self.bounds.height() / self.rect.height() as f64;
 
         RTPlotPoint::new(x, y)
     }

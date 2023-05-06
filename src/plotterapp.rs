@@ -1,22 +1,15 @@
-use std::collections::HashSet;
-use std::sync::mpsc::Receiver;
-
-use eframe::epaint::ahash::{HashMap, HashMapExt};
-use egui::Rect;
-
-use crate::{PlotLogic, GlobalPlotLogic};
+use crate::framehistory::FrameHistory;
 use crate::layout::{PlotLayout, SignalList};
 use crate::signal_group::{SignalGroup, SignalHandle};
-use crate::{framehistory::FrameHistory, widget::RTPlot};
+use std::collections::HashSet;
+use std::ops::RangeInclusive;
+use std::sync::mpsc::Receiver;
 
 pub struct PlotterApp {
     signals: SignalGroup,
     frame_history: FrameHistory,
     num_points: usize,
-    test: bool,
     plot_layout: PlotLayout,
-    plot_logics: HashMap<String, PlotLogic>,
-    global_logic: GlobalPlotLogic,
 }
 
 impl PlotterApp {
@@ -24,16 +17,13 @@ impl PlotterApp {
     #[allow(unused)]
     pub fn new(
         cc: &eframe::CreationContext<'_>,
-        new_signal_receiver: Receiver<SignalHandle>,
+        on_new_signal_receiver: Receiver<SignalHandle>,
     ) -> Self {
         return PlotterApp {
-            signals: SignalGroup::new(new_signal_receiver),
+            signals: SignalGroup::new(on_new_signal_receiver),
             frame_history: FrameHistory::default(),
             num_points: 0,
-            test: false,
             plot_layout: PlotLayout::new(),
-            plot_logics: HashMap::new(),
-            global_logic: GlobalPlotLogic::default()
         };
     }
 }
@@ -51,44 +41,41 @@ impl eframe::App for PlotterApp {
             // The top panel is often a good place for a menu bar:
 
             ui.horizontal(|ui| {
-                // egui::menu::bar(ui, |ui| {
-                //     ui.menu_button("File", |ui| {
-                //         if ui.button("Quit").clicked() {
-                //             _frame.close();
-                //         }
-                //     });
-                // });
+                egui::menu::bar(ui, |ui| {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Quit").clicked() {
+                            _frame.close();
+                        }
+                    });
+                });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("Reset memory").clicked() {
                         ui.ctx().memory_mut(|mem| *mem = Default::default());
                     }
 
-                    if ui.selectable_label(self.test, "Prova 123").clicked() {
-                        // self.test = !self.test;
-                    }
+                    ui.add(
+                        egui::DragValue::new(&mut self.plot_layout.settings.window_length)
+                            .speed(1.0)
+                            .suffix(" s")
+                            .clamp_range(RangeInclusive::new(0.001f64, std::f64::INFINITY)),
+                    );
+                    ui.label("Width:");
 
-                    ui.label("a1234");
-                    ui.label("b1234");
-                    ui.label("c1234");
-                    ui.label("d1234");
+                    ui.toggle_value(&mut self.plot_layout.settings.link_group.link_x, "Link X");
+                    ui.toggle_value(&mut self.plot_layout.settings.real_time, "Follow");
                 });
             });
         });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            // SignalList::new().ui(ui, sign);
-
-            
             match self.plot_layout.tree.find_active_focused() {
                 Some((_, tab)) => {
                     SignalList::new().ui(ui, &self.signals, &mut tab.signals);
-
                 }
                 None => {
                     SignalList::new().ui(ui, &self.signals, &mut HashSet::new());
                 }
             }
-
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 egui::warn_if_debug_build(ui);
@@ -103,8 +90,6 @@ impl eframe::App for PlotterApp {
             self.num_points = 1usize;
 
             self.plot_layout.ui(ui, &self.signals);
-
-            // RTPlot::new("rt_plot").show(ui, sig.unwrap()); // Panic for now
         });
     }
 }
