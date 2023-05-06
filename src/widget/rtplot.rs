@@ -6,7 +6,7 @@ use std::{
 };
 
 use egui::{
-    plot::{Plot, PlotBounds, PlotPoint, PlotUi},
+    plot::{Plot, PlotBounds, PlotPoint, PlotUi, Legend},
     InnerResponse, Rect, Ui, Vec2,
 };
 
@@ -110,6 +110,7 @@ impl RTPlot {
             .allow_zoom(false)
             .allow_drag(false)
             .allow_boxed_zoom(false)
+            .legend(Legend::default())
             .show::<InnerPlotResponse>(ui, |plot_ui| {
                 let mut bounds = plot_ui.plot_bounds();
                 
