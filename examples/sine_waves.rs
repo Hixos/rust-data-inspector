@@ -13,12 +13,12 @@ use std::time::{Instant, Duration};
 fn main() -> eframe::Result<()> {
     let start = Instant::now();
 
-    let (new_sig_sender, new_sig_receiver) = channel();
+    let (add_new_signal_snd, add_new_signal_rec) = channel();
 
     let mut rng = rand::thread_rng();
     let mut add_signal = |name: &str| {
 
-        let (_, shandle) = new_signal_producer(
+        let (_, signal_handle) = new_signal_producer(
             String::from(name),
             rng.gen::<f64>() * 10.0 + 5.0,
             rng.gen(),
@@ -27,7 +27,7 @@ fn main() -> eframe::Result<()> {
             Some(start),
         );
 
-        new_sig_sender.send(shandle).unwrap(); // Panic on failure
+        add_new_signal_snd.send(signal_handle).unwrap(); // Panic on failure
     };
 
     add_signal("a/b/s1");
@@ -45,7 +45,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Plotter",
         native_options,
-        Box::new(|cc| Box::new(plotter::PlotterApp::new(cc, new_sig_receiver))),
+        Box::new(|cc| Box::new(plotter::PlotterApp::new(cc, add_new_signal_rec))),
     )
 }
 
@@ -79,7 +79,7 @@ pub fn new_signal_producer<S: Into<String>>(
     rate: f32,
     start_time: Option<Instant>,
 ) -> (JoinHandle<()>, SignalHandle) {
-    let (sender, receiver) = mpsc::channel();
+    let (sample_sender, sample_receiver) = mpsc::channel();
 
     let handle = thread::spawn(move || {
         let period_ms = u64::max((1000f32 / rate) as u64, 1);
@@ -92,7 +92,7 @@ pub fn new_signal_producer<S: Into<String>>(
 
             let y = a * f64::sin(2f64 * PI * f * t + phi);
 
-            let res = sender.send(SignalSample { t, y });
+            let res = sample_sender.send(SignalSample { t, y });
 
             if res.is_ok() {
                 thread::sleep(Duration::from_millis(period_ms))
@@ -106,7 +106,7 @@ pub fn new_signal_producer<S: Into<String>>(
         handle,
         SignalHandle {
             signal: Signal::new(name),
-            on_new_sample: receiver,
+            on_new_sample: sample_receiver,
         },
     );
 }
