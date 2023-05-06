@@ -99,7 +99,7 @@ impl<'a> egui_dock::TabViewer for PlotTabViewer<'a> {
             plot.link_axis(self.settings.link_group.clone());
         }
 
-        let res = plot.show(ui, |plot_ui| {
+        plot.show(ui, |plot_ui| {
             let bounds = plot_ui.plot_bounds();
 
             let screen_rect = PlotHelper::get_screen_bounds(plot_ui);
