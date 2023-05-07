@@ -64,6 +64,7 @@ impl eframe::App for PlotterApp {
 
                     ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FOLLOW, "Follow");
                     ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FIT, "Fit");
+                    ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FREE, "Free");
                     ui.toggle_value(&mut self.plot_layout.settings.link_group.link_x, "Link X");
                 });
             });
