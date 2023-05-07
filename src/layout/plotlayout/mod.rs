@@ -1,3 +1,3 @@
 mod plotlayout;
 
-pub use plotlayout::PlotLayout;
+pub use plotlayout::{PlotLayout, XAxisMode};

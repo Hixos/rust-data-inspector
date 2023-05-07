@@ -4,11 +4,17 @@ use egui_dock::NodeIndex;
 use crate::{
     signal::Signal,
     util::plothelper::{AxisBounds, PlotHelper},
-    widget::{RTPlot, LinkedAxisGroup},
+    widget::{LinkedAxisGroup, RTPlot},
     SignalGroup,
-    
 };
 use std::collections::HashSet;
+
+#[derive(Clone, PartialEq)]
+pub enum XAxisMode {
+    FOLLOW,
+    FIT,
+    FREE,
+}
 
 pub struct PlotLayout {
     pub tree: egui_dock::Tree<PlotTab>,
@@ -19,7 +25,7 @@ pub struct PlotLayout {
 
 #[derive(Clone)]
 pub struct PlotSettings {
-    pub real_time: bool,
+    pub x_axis_mode: XAxisMode,
     pub window_length: f64,
     pub link_group: LinkedAxisGroup,
 }
@@ -27,7 +33,7 @@ pub struct PlotSettings {
 impl Default for PlotSettings {
     fn default() -> Self {
         PlotSettings {
-            real_time: true,
+            x_axis_mode: XAxisMode::FIT,
             window_length: 60f64,
             link_group: LinkedAxisGroup::new(true),
         }
@@ -38,7 +44,7 @@ impl PlotLayout {
     pub fn new() -> Self {
         let mut tree = egui_dock::Tree::new(vec![PlotTab::new(1)]);
         tree.set_focused_node(NodeIndex::root());
-        
+
         PlotLayout {
             tree,
             settings: PlotSettings::default(),
@@ -88,13 +94,23 @@ impl<'a> egui_dock::TabViewer for PlotTabViewer<'a> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         let mut plot = RTPlot::new(tab.index.to_string());
 
-        if self.settings.real_time {
-            let t = self.signals.current_timestamp().unwrap_or(0f64);
-
-            plot.set_x_bounds(AxisBounds {
-                min: t - self.settings.window_length,
-                max: t,
-            });
+        match self.settings.x_axis_mode {
+            XAxisMode::FOLLOW => {
+                let t_end = self.signals.current_timestamp().unwrap_or(0f64);
+                plot.set_x_bounds(AxisBounds {
+                    min: t_end - self.settings.window_length,
+                    max: t_end,
+                });
+            }
+            XAxisMode::FIT => {
+                let t_end = self.signals.current_timestamp().unwrap_or(0f64);
+                let t_start = self.signals.initial_timestamp().unwrap_or(0f64);
+                plot.set_x_bounds(AxisBounds {
+                    min: t_start,
+                    max: t_end,
+                });
+            }
+            XAxisMode::FREE => {}
         }
 
         if self.settings.link_group.link_x {
@@ -115,7 +131,6 @@ impl<'a> egui_dock::TabViewer for PlotTabViewer<'a> {
                 ));
             }
         });
-
     }
 
     fn on_add(&mut self, node: egui_dock::NodeIndex) {

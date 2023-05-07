@@ -84,6 +84,31 @@ impl SignalGroup {
         max
     }
 
+    pub fn initial_timestamp(&self) -> Option<f64> {
+        let mut min: Option<f64> = None;
+
+        for (_, signal) in &self.signals {
+            let ts = signal.signal.time().first();
+            match ts {
+                Some(ts) => {
+                    match &min {
+                        Some(min_val) => {
+                            if ts < min_val {
+                                min = Some(*ts);
+                            }
+                        }
+                        None => {
+                            min = Some(*ts);
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+
+        min
+    }
+
     fn tree_insert(tree: &mut SimpleTree<NameNode>, name: String) -> Result<(), ()> {
         let join_path = |a: &str, b: &str| {
             if a != "" {

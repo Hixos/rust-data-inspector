@@ -1,5 +1,7 @@
+use egui::Frame;
+
 use crate::framehistory::FrameHistory;
-use crate::layout::{PlotLayout, SignalList};
+use crate::layout::{PlotLayout, SignalList, XAxisMode};
 use crate::signal_group::{SignalGroup, SignalHandle};
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
@@ -43,16 +45,15 @@ impl eframe::App for PlotterApp {
             ui.horizontal(|ui| {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
+                        if ui.button("Reset memory").clicked() {
+                            ui.ctx().memory_mut(|mem| *mem = Default::default());
+                        }
                         if ui.button("Quit").clicked() {
                             _frame.close();
                         }
                     });
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Reset memory").clicked() {
-                        ui.ctx().memory_mut(|mem| *mem = Default::default());
-                    }
-
                     ui.add(
                         egui::DragValue::new(&mut self.plot_layout.settings.window_length)
                             .speed(1.0)
@@ -61,8 +62,9 @@ impl eframe::App for PlotterApp {
                     );
                     ui.label("Width:");
 
+                    ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FOLLOW, "Follow");
+                    ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FIT, "Fit");
                     ui.toggle_value(&mut self.plot_layout.settings.link_group.link_x, "Link X");
-                    ui.toggle_value(&mut self.plot_layout.settings.real_time, "Follow");
                 });
             });
         });
@@ -85,11 +87,13 @@ impl eframe::App for PlotterApp {
             });
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-            self.num_points = 1usize;
+        egui::CentralPanel::default()
+            .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
+            .show(ctx, |ui| {
+                // The central panel the region left after adding TopPanel's and SidePanel's
+                self.num_points = 1usize;
 
-            self.plot_layout.ui(ui, &self.signals);
-        });
+                self.plot_layout.ui(ui, &self.signals);
+            });
     }
 }
