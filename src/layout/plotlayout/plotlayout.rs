@@ -1,5 +1,6 @@
 use egui::plot::{Line, PlotBounds, PlotPoint, PlotPoints};
 use egui_dock::NodeIndex;
+use serde::{Serialize, Deserialize};
 
 use crate::{
     signal::Signal,
@@ -9,13 +10,14 @@ use crate::{
 };
 use std::collections::HashSet;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum XAxisMode {
     FOLLOW,
     FIT,
     FREE,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PlotLayout {
     pub tree: egui_dock::Tree<PlotTab>,
     pub settings: PlotSettings,
@@ -23,7 +25,7 @@ pub struct PlotLayout {
     tab_counter: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PlotSettings {
     pub x_axis_mode: XAxisMode,
     pub window_length: f64,
@@ -142,6 +144,7 @@ impl<'a> egui_dock::TabViewer for PlotTabViewer<'a> {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PlotTab {
     pub signals: HashSet<String>,
 

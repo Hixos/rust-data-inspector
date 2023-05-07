@@ -51,7 +51,7 @@ impl PlotMemory {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct LinkedAxisGroup {
     pub link_x: bool,
     bounds: Rc<Cell<Option<AxisBounds>>>,

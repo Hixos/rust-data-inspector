@@ -21,6 +21,19 @@ impl PlotterApp {
         cc: &eframe::CreationContext<'_>,
         on_new_signal_receiver: Receiver<SignalHandle>,
     ) -> Self {
+        if cc.storage.is_some() {
+
+            let pl = eframe::get_value::<PlotLayout>(cc.storage.unwrap(), "plot_layout");
+
+            if pl.is_some()  {
+                return PlotterApp {
+                    signals: SignalGroup::new(on_new_signal_receiver),
+                    frame_history: FrameHistory::default(),
+                    num_points: 0,
+                    plot_layout: pl.unwrap(),
+                };
+            }
+        }
         return PlotterApp {
             signals: SignalGroup::new(on_new_signal_receiver),
             frame_history: FrameHistory::default(),
@@ -96,5 +109,9 @@ impl eframe::App for PlotterApp {
 
                 self.plot_layout.ui(ui, &self.signals);
             });
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, "plot_layout", &self.plot_layout);
     }
 }
