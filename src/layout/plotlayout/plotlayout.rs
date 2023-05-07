@@ -1,4 +1,5 @@
 use egui::plot::{Line, PlotBounds, PlotPoint, PlotPoints};
+use egui_dock::NodeIndex;
 
 use crate::{
     signal::Signal,
@@ -35,8 +36,9 @@ impl Default for PlotSettings {
 
 impl PlotLayout {
     pub fn new() -> Self {
-        let tree = egui_dock::Tree::new(vec![PlotTab::new(1)]);
-
+        let mut tree = egui_dock::Tree::new(vec![PlotTab::new(1)]);
+        tree.set_focused_node(NodeIndex::root());
+        
         PlotLayout {
             tree,
             settings: PlotSettings::default(),
