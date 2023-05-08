@@ -1,3 +1,7 @@
+use egui::Color32;
+use egui::epaint::Hsva;
+use serde::{Deserialize, Serialize};
+
 use super::signal::{Signal, SignalSample};
 use super::util::SimpleTree;
 use std::collections::HashMap;
@@ -18,7 +22,22 @@ pub struct SignalHandle {
 pub struct SignalGroup {
     signals: HashMap<String, SignalHandle>,
     on_new_signal: Receiver<SignalHandle>,
-    name_tree: SimpleTree<NameNode>
+    name_tree: SimpleTree<NameNode>,
+    pub signal_data: SignalData,
+    next_auto_color_idx: usize,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SignalData {
+    pub colors: HashMap<String, Color32>,
+}
+
+impl Default for SignalData {
+    fn default() -> Self {
+        SignalData {
+            colors: HashMap::new(),
+        }
+    }
 }
 
 impl SignalGroup {
@@ -30,7 +49,9 @@ impl SignalGroup {
                 name: "".into(),
                 path: "".into(),
                 is_signal: false,
-            })
+            }),
+            signal_data: SignalData::default(),
+            next_auto_color_idx: 0,
         }
     }
 
@@ -39,8 +60,13 @@ impl SignalGroup {
             let name = handle.signal.name().to_string();
             self.signals.insert(name.clone(), handle);
 
-            if Self::tree_insert(&mut self.name_tree, name).is_err() {
+            if Self::tree_insert(&mut self.name_tree, &name).is_err() {
                 panic!("Insertion in tree failed!");
+            }
+
+            if !self.signal_data.colors.contains_key(&name) {
+                self.signal_data.colors.insert(name, Self::auto_color(self.next_auto_color_idx));
+                self.next_auto_color_idx += 1;
             }
         }
 
@@ -65,18 +91,16 @@ impl SignalGroup {
         for (_, signal) in &self.signals {
             let ts = signal.signal.time().last();
             match ts {
-                Some(ts) => {
-                    match &max {
-                        Some(max_val) => {
-                            if ts > max_val {
-                                max = Some(*ts);
-                            }
-                        }
-                        None => {
+                Some(ts) => match &max {
+                    Some(max_val) => {
+                        if ts > max_val {
                             max = Some(*ts);
                         }
                     }
-                }
+                    None => {
+                        max = Some(*ts);
+                    }
+                },
                 None => {}
             }
         }
@@ -90,18 +114,16 @@ impl SignalGroup {
         for (_, signal) in &self.signals {
             let ts = signal.signal.time().first();
             match ts {
-                Some(ts) => {
-                    match &min {
-                        Some(min_val) => {
-                            if ts < min_val {
-                                min = Some(*ts);
-                            }
-                        }
-                        None => {
+                Some(ts) => match &min {
+                    Some(min_val) => {
+                        if ts < min_val {
                             min = Some(*ts);
                         }
                     }
-                }
+                    None => {
+                        min = Some(*ts);
+                    }
+                },
                 None => {}
             }
         }
@@ -109,7 +131,7 @@ impl SignalGroup {
         min
     }
 
-    fn tree_insert(tree: &mut SimpleTree<NameNode>, name: String) -> Result<(), ()> {
+    fn tree_insert(tree: &mut SimpleTree<NameNode>, name: &String) -> Result<(), ()> {
         let join_path = |a: &str, b: &str| {
             if a != "" {
                 return [a.to_string(), b.to_string()].join("/");
@@ -123,7 +145,7 @@ impl SignalGroup {
                     let elem = &n.elem;
                     if elem.name == first {
                         if !elem.is_signal {
-                            return Self::tree_insert(n, second.into());
+                            return Self::tree_insert(n, &second.to_string());
                         } else {
                             // Signal nodes cannot have additional children
                             return Err(());
@@ -140,11 +162,11 @@ impl SignalGroup {
                     is_signal: false,
                 });
 
-                Self::tree_insert(child, second.into())
+                Self::tree_insert(child, &second.to_string())
             }
             None => {
                 // We are a leaf, check if there are no other leafs with the same name, otherwise add it
-                if tree.get_children_mut().iter().any(|n| n.elem.name == name) {
+                if tree.get_children_mut().iter().any(|n| n.elem.name == *name) {
                     return Err(());
                 } else {
                     tree.add_child(NameNode {
@@ -156,5 +178,12 @@ impl SignalGroup {
                 }
             }
         }
+    }
+    
+    fn auto_color(color_idx: usize) -> Color32 {
+        let i = color_idx;
+        let golden_ratio = (5.0_f32.sqrt() - 1.0) / 2.0; // 0.61803398875
+        let h = i as f32 * golden_ratio;
+        Hsva::new(h, 0.85, 0.5, 1.0).into()
     }
 }

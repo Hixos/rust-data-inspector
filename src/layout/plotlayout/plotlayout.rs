@@ -172,10 +172,11 @@ impl PlotTab {
         screen_bounds: &egui::Rect,
     ) -> Line {
         let signal = signal_group.get_signal(signal_key.clone());
+        let color = signal_group.signal_data.colors.get(signal_key).unwrap().clone();
 
         match signal {
             Some(signal) => {
-                Line::new(Self::get_visible_points(signal, bounds, screen_bounds)).name(signal_key)
+                Line::new(Self::get_visible_points(signal, bounds, screen_bounds)).name(signal_key).color(color)
             }
             None => Line::new(PlotPoints::new(vec![])),
         }
