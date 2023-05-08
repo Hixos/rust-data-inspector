@@ -86,10 +86,10 @@ impl eframe::App for PlotterApp {
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             match self.plot_layout.tree.find_active_focused() {
                 Some((_, tab)) => {
-                    SignalList::new().ui(ui, &self.signals, &mut tab.signals);
+                    SignalList::new().ui(ui, &mut self.signals, &mut tab.signals);
                 }
                 None => {
-                    SignalList::new().ui(ui, &self.signals, &mut HashSet::new());
+                    SignalList::new().ui(ui, &mut self.signals, &mut HashSet::new());
                 }
             }
 
