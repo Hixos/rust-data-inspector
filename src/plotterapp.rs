@@ -13,6 +13,7 @@ pub struct PlotterApp {
     frame_history: FrameHistory,
     num_points: usize,
     plot_layout: PlotLayout,
+    invalidate_storage: bool,
     // logic_thread: JoinHandle<>
 }
 
@@ -28,13 +29,18 @@ impl PlotterApp {
             frame_history: FrameHistory::default(),
             num_points: 0,
             plot_layout: PlotLayout::new(),
+            invalidate_storage: false,
         };
 
         if cc.storage.is_some() {
-            let pl = eframe::get_value::<PlotLayout>(cc.storage.unwrap(), "plot_layout");
+            let invalidate = eframe::get_value::<bool>(cc.storage.unwrap(), "invalidate_storage");
 
-            if pl.is_some() {
-                plotter_app.plot_layout = pl.unwrap();
+            if !invalidate.unwrap_or(false) {
+                let pl = eframe::get_value::<PlotLayout>(cc.storage.unwrap(), "plot_layout");
+
+                if pl.is_some() {
+                    plotter_app.plot_layout = pl.unwrap();
+                }
             }
         }
 
@@ -48,11 +54,10 @@ impl PlotterApp {
 }
 
 impl eframe::App for PlotterApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.signals.lock().unwrap().receive();
-
         self.frame_history
-            .on_new_frame(ctx.input(|i| i.time), _frame.info().cpu_usage);
+            .on_new_frame(ctx.input(|i| i.time), frame.info().cpu_usage);
 
         ctx.request_repaint();
 
@@ -62,11 +67,13 @@ impl eframe::App for PlotterApp {
             ui.horizontal(|ui| {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
-                        if ui.button("Reset memory").clicked() {
+                        if ui.button("Reset memory & close").clicked() {
                             ui.ctx().memory_mut(|mem| *mem = Default::default());
+                            self.invalidate_storage = true;
+                            frame.close()
                         }
                         if ui.button("Quit").clicked() {
-                            _frame.close();
+                            frame.close();
                         }
                     });
                 });
@@ -105,7 +112,11 @@ impl eframe::App for PlotterApp {
                     SignalList::new().ui(ui, &mut self.signals.lock().unwrap(), &mut tab.signals);
                 }
                 None => {
-                    SignalList::new().ui(ui, &mut self.signals.lock().unwrap(), &mut HashSet::new());
+                    SignalList::new().ui(
+                        ui,
+                        &mut self.signals.lock().unwrap(),
+                        &mut HashSet::new(),
+                    );
                 }
             }
 
@@ -129,5 +140,6 @@ impl eframe::App for PlotterApp {
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, "plot_layout", &self.plot_layout);
+        eframe::set_value(storage, "invalidate_storage", &self.invalidate_storage);
     }
 }
