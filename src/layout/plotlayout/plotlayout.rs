@@ -1,6 +1,9 @@
-use egui::{plot::{Line, PlotBounds, PlotPoint, PlotPoints}, Color32};
+use egui::{
+    plot::{Line, PlotBounds, PlotPoint, PlotPoints},
+    Color32,
+};
 use egui_dock::NodeIndex;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     signal::Signal,
@@ -56,7 +59,9 @@ impl PlotLayout {
 
     pub fn ui(&mut self, ui: &mut egui::Ui, signals: &SignalGroup) {
         let mut style = egui_dock::Style::from_egui(ui.style().as_ref());
+
         style.show_add_buttons = true;
+        style.show_close_buttons = self.tree.num_tabs() > 1;
         let mut tab_viewer = PlotTabViewer::new(self.settings.clone(), signals);
 
         egui_dock::DockArea::new(&mut self.tree)
@@ -172,12 +177,17 @@ impl PlotTab {
         screen_bounds: &egui::Rect,
     ) -> Line {
         let signal = signal_group.get_signal(signal_key.clone());
-        let color = signal_group.signal_data.colors.get(signal_key).unwrap_or(&Color32::WHITE).clone();
+        let color = signal_group
+            .signal_data
+            .colors
+            .get(signal_key)
+            .unwrap_or(&Color32::WHITE)
+            .clone();
 
         match signal {
-            Some(signal) => {
-                Line::new(Self::get_visible_points(signal, bounds, screen_bounds)).name(signal_key).color(color)
-            }
+            Some(signal) => Line::new(Self::get_visible_points(signal, bounds, screen_bounds))
+                .name(signal_key)
+                .color(color),
             None => Line::new(PlotPoints::new(vec![])),
         }
     }
