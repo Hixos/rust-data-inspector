@@ -1,4 +1,4 @@
-use egui::plot::{Line, PlotBounds, PlotPoint, PlotPoints};
+use egui::{plot::{Line, PlotBounds, PlotPoint, PlotPoints}, Color32};
 use egui_dock::NodeIndex;
 use serde::{Serialize, Deserialize};
 
@@ -172,7 +172,7 @@ impl PlotTab {
         screen_bounds: &egui::Rect,
     ) -> Line {
         let signal = signal_group.get_signal(signal_key.clone());
-        let color = signal_group.signal_data.colors.get(signal_key).unwrap().clone();
+        let color = signal_group.signal_data.colors.get(signal_key).unwrap_or(&Color32::WHITE).clone();
 
         match signal {
             Some(signal) => {

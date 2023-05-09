@@ -2,50 +2,54 @@ use egui::Frame;
 
 use crate::framehistory::FrameHistory;
 use crate::layout::{PlotLayout, SignalList, XAxisMode};
-use crate::signal_group::{SignalGroup, SignalHandle};
+use crate::signal_group::SignalGroup;
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
-use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 pub struct PlotterApp {
-    signals: SignalGroup,
+    signals: Arc<Mutex<SignalGroup>>,
     frame_history: FrameHistory,
     num_points: usize,
     plot_layout: PlotLayout,
+    // logic_thread: JoinHandle<>
 }
 
 impl PlotterApp {
     /// Called once before the first frame.
     #[allow(unused)]
-    pub fn new(
-        cc: &eframe::CreationContext<'_>,
-        on_new_signal_receiver: Receiver<SignalHandle>,
-    ) -> Self {
-        if cc.storage.is_some() {
-
-            let pl = eframe::get_value::<PlotLayout>(cc.storage.unwrap(), "plot_layout");
-
-            if pl.is_some()  {
-                return PlotterApp {
-                    signals: SignalGroup::new(on_new_signal_receiver),
-                    frame_history: FrameHistory::default(),
-                    num_points: 0,
-                    plot_layout: pl.unwrap(),
-                };
-            }
-        }
-        return PlotterApp {
-            signals: SignalGroup::new(on_new_signal_receiver),
+    pub fn start<F>(cc: &eframe::CreationContext<'_>, app_logic: F) -> Self
+    where
+        F: FnOnce(Arc<Mutex<SignalGroup>>) + Send + Clone + 'static,
+    {
+        let mut plotter_app = PlotterApp {
+            signals: Arc::new(Mutex::new(SignalGroup::new())),
             frame_history: FrameHistory::default(),
             num_points: 0,
             plot_layout: PlotLayout::new(),
         };
+
+        if cc.storage.is_some() {
+            let pl = eframe::get_value::<PlotLayout>(cc.storage.unwrap(), "plot_layout");
+
+            if pl.is_some() {
+                plotter_app.plot_layout = pl.unwrap();
+            }
+        }
+
+        let signals = plotter_app.signals.clone();
+
+        // Start app logic thread
+        thread::spawn(move || app_logic(signals));
+
+        plotter_app
     }
 }
 
 impl eframe::App for PlotterApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.signals.update();
+        self.signals.lock().unwrap().receive();
 
         self.frame_history
             .on_new_frame(ctx.input(|i| i.time), _frame.info().cpu_usage);
@@ -75,9 +79,21 @@ impl eframe::App for PlotterApp {
                     );
                     ui.label("Width:");
 
-                    ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FOLLOW, "Follow");
-                    ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FIT, "Fit");
-                    ui.selectable_value(&mut self.plot_layout.settings.x_axis_mode, XAxisMode::FREE, "Free");
+                    ui.selectable_value(
+                        &mut self.plot_layout.settings.x_axis_mode,
+                        XAxisMode::FOLLOW,
+                        "Follow",
+                    );
+                    ui.selectable_value(
+                        &mut self.plot_layout.settings.x_axis_mode,
+                        XAxisMode::FIT,
+                        "Fit",
+                    );
+                    ui.selectable_value(
+                        &mut self.plot_layout.settings.x_axis_mode,
+                        XAxisMode::FREE,
+                        "Free",
+                    );
                     ui.toggle_value(&mut self.plot_layout.settings.link_group.link_x, "Link X");
                 });
             });
@@ -86,10 +102,10 @@ impl eframe::App for PlotterApp {
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             match self.plot_layout.tree.find_active_focused() {
                 Some((_, tab)) => {
-                    SignalList::new().ui(ui, &mut self.signals, &mut tab.signals);
+                    SignalList::new().ui(ui, &mut self.signals.lock().unwrap(), &mut tab.signals);
                 }
                 None => {
-                    SignalList::new().ui(ui, &mut self.signals, &mut HashSet::new());
+                    SignalList::new().ui(ui, &mut self.signals.lock().unwrap(), &mut HashSet::new());
                 }
             }
 
@@ -107,7 +123,7 @@ impl eframe::App for PlotterApp {
                 // The central panel the region left after adding TopPanel's and SidePanel's
                 self.num_points = 1usize;
 
-                self.plot_layout.ui(ui, &self.signals);
+                self.plot_layout.ui(ui, &self.signals.lock().unwrap());
             });
     }
 

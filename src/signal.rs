@@ -10,9 +10,9 @@ pub struct Signal {
 }
 
 impl Signal {
-    pub fn new<S: Into<String>>(name: S) -> Signal {
+    pub fn new(name: &str) -> Signal {
         return Signal {
-            name: name.into(),
+            name: name.to_string(),
             time: vec![],
             data: vec![],
         };

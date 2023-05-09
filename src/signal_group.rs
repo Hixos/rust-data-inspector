@@ -1,11 +1,11 @@
-use egui::Color32;
 use egui::epaint::Hsva;
+use egui::Color32;
 use serde::{Deserialize, Serialize};
 
 use super::signal::{Signal, SignalSample};
 use super::util::SimpleTree;
 use std::collections::HashMap;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 #[derive(Debug)]
 pub struct NameNode {
@@ -21,9 +21,9 @@ pub struct SignalHandle {
 
 pub struct SignalGroup {
     signals: HashMap<String, SignalHandle>,
-    on_new_signal: Receiver<SignalHandle>,
-    name_tree: SimpleTree<NameNode>,
     pub signal_data: SignalData,
+
+    name_tree: SimpleTree<NameNode>,
     next_auto_color_idx: usize,
 }
 
@@ -41,10 +41,9 @@ impl Default for SignalData {
 }
 
 impl SignalGroup {
-    pub fn new(receiver: Receiver<SignalHandle>) -> Self {
+    pub fn new() -> Self {
         SignalGroup {
             signals: HashMap::new(),
-            on_new_signal: receiver,
             name_tree: SimpleTree::new(NameNode {
                 name: "".into(),
                 path: "".into(),
@@ -55,26 +54,36 @@ impl SignalGroup {
         }
     }
 
-    pub fn update(&mut self) {
-        for handle in self.on_new_signal.try_iter() {
-            let name = handle.signal.name().to_string();
-            self.signals.insert(name.clone(), handle);
-
-            if Self::tree_insert(&mut self.name_tree, &name).is_err() {
-                panic!("Insertion in tree failed!");
-            }
-
-            if !self.signal_data.colors.contains_key(&name) {
-                self.signal_data.colors.insert(name, Self::auto_color(self.next_auto_color_idx));
-                self.next_auto_color_idx += 1;
-            }
-        }
-
+    pub fn receive(&mut self) {
         for handle in self.signals.values_mut() {
             for sample in handle.on_new_sample.try_iter() {
                 handle.signal.push(sample);
             }
         }
+    }
+
+    pub fn add_signal(&mut self, name: &str) -> Sender<SignalSample> {
+        let (sender, receiver) = channel();
+
+        let signal_handle = SignalHandle {
+            signal: Signal::new(name),
+            on_new_sample: receiver,
+        };
+
+        self.signals.insert(name.into(), signal_handle);
+
+        if Self::tree_insert(&mut self.name_tree, &name.into()).is_err() {
+            panic!("Insertion in tree failed!");
+        }
+
+        if !self.signal_data.colors.contains_key(&name.to_string()) {
+            self.signal_data
+                .colors
+                .insert(name.into(), Self::auto_color(self.next_auto_color_idx));
+            self.next_auto_color_idx += 1;
+        }
+
+        sender
     }
 
     pub fn get_signal<S: Into<String>>(&self, key: S) -> Option<&Signal> {
@@ -179,7 +188,7 @@ impl SignalGroup {
             }
         }
     }
-    
+
     fn auto_color(color_idx: usize) -> Color32 {
         let i = color_idx;
         let golden_ratio = (5.0_f32.sqrt() - 1.0) / 2.0; // 0.61803398875
