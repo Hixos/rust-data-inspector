@@ -7,9 +7,9 @@ rust-version = "1.65"
 
 
 [dependencies]
-egui = "0.21.0"
-egui_dock = {version = "0.4", features = [ "serde" ]}
-eframe = { version = "0.21.0", default-features = false, features = [
+egui = "0.22.0"
+egui_dock = {version = "0.6.1", features = [ "serde" ]}
+eframe = { version = "0.22.0", default-features = false, features = [
     "default_fonts", # Embed the default egui fonts.
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
     "persistence",   # Enable restoring app state when restarting the app.

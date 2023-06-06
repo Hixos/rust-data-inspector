@@ -58,13 +58,14 @@ impl PlotLayout {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, signals: &SignalGroup) {
-        let mut style = egui_dock::Style::from_egui(ui.style().as_ref());
+        let style = egui_dock::Style::from_egui(ui.style().as_ref());
 
-        style.show_add_buttons = true;
-        style.show_close_buttons = self.tree.num_tabs() > 1;
         let mut tab_viewer = PlotTabViewer::new(self.settings.clone(), signals);
 
+        let show_close_btn = self.tree.num_tabs() > 1;
         egui_dock::DockArea::new(&mut self.tree)
+            .show_add_buttons(true)
+            .show_close_buttons(show_close_btn)
             .style(style)
             .show_inside(ui, &mut tab_viewer);
 
