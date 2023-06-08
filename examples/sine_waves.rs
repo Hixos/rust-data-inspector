@@ -10,45 +10,40 @@ use std::time::{Duration, Instant};
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
-fn main() {
-    let handle = thread::spawn(move || {
-        let native_options = eframe::NativeOptions::default();
-        let res = eframe::run_native(
-            "Plotter",
-            native_options,
-            Box::new(|cc| {
-                Box::new(plotter::PlotterApp::start(cc, |signals| {
-                    let start = Instant::now();
-                    let mut rng = rand::thread_rng();
+fn main() -> eframe::Result<()> {
+    let native_options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Plotter",
+        native_options,
+        Box::new(|cc| {
+            Box::new(plotter::PlotterApp::start(cc, |signals| {
+                let start = Instant::now();
+                let mut rng = rand::thread_rng();
+                let mut add_signal = |name: &str| {
+                    new_signal_producer(
+                        signals.clone(),
+                        name,
+                        rng.gen::<f64>() * 10.0 + 5.0,
+                        rng.gen(),
+                        rng.gen::<f64>() * PI * 2.0,
+                        rng.gen::<f32>() * 100f32 + 2f32,
+                        Some(start),
+                    );
+                };
 
-                    let mut add_signal = |name: &str| {
-                        new_signal_producer(
-                            signals.clone(),
-                            name,
-                            rng.gen::<f64>() * 10.0 + 5.0,
-                            rng.gen(),
-                            rng.gen::<f64>() * PI * 2.0,
-                            rng.gen::<f32>() * 100f32 + 2f32,
-                            Some(start),
-                        );
-                    };
-
-                    add_signal("a/b/s1");
-                    add_signal("a/b/s2");
-                    add_signal("a/b/s3");
-                    add_signal("a/c/s1");
-                    add_signal("a/c/s2");
-                    add_signal("b/s1");
-                    add_signal("b/s2");
-                    add_signal("b/c/s1");
-                    add_signal("s1");
-                    add_signal("s2");
-                }))
-            }),
-        );
-    });
-
-    let res = handle.join();
+                add_signal("a/b/s1");
+                add_signal("a/b/s2");
+                add_signal("a/b/s3");
+                add_signal("a/c/s1");
+                add_signal("a/c/s2");
+                add_signal("b/s1");
+                add_signal("b/s2");
+                add_signal("b/c/s1");
+                add_signal("s1");
+                add_signal("s2");
+            }))
+        }),
+    )
 }
 
 // when compiling to web using trunk.
