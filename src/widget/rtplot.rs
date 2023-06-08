@@ -142,7 +142,7 @@ impl RTPlot {
 
                 // plot_ui.
 
-                if plot_ui.plot_bounds() != orig_bounds && group_ref.is_some() {
+                if bounds != orig_bounds && group_ref.is_some() {
                     group_ref.unwrap().bounds.set(Some(AxisBounds::from_x_bounds(bounds)));
                 }
 
@@ -150,7 +150,7 @@ impl RTPlot {
                 let screen_bounds = PlotHelper::get_screen_bounds(plot_ui);
 
                 InnerPlotResponse {
-                    bounds: plot_ui.plot_bounds(),
+                    bounds: bounds,
                     screen_bounds,
                 }
             });
