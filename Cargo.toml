@@ -6,11 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eframe = { version = "0.23.0", default-features = false, features = [
+eframe = { version = "0.25.0", default-features = false, features = [
     "default_fonts",
     "glow",
     "persistence",
 ] }
-egui = "0.23.0"
-egui_dock = { version = "0.8.2", features = ["serde"] }
+egui = "0.25.0"
+egui_tiles = "0.6.0"
 rand = "0.8.5"
+rust-data-inspector-signals = {path = "rust-data-inspector-signals"}
+thiserror = "1.0.56"
+
+[workspace]
+members = ["rust-data-inspector-signals"]
