@@ -52,6 +52,7 @@ impl FrameHistory {
         // }
     }
 
+    #[allow(dead_code)]
     fn graph(&mut self, ui: &mut egui::Ui) -> egui::Response {
         use egui::*;
 
