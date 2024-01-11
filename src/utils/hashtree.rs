@@ -12,6 +12,7 @@ pub struct HashTree<K, V> {
     childs: HashMap<K, HashTree<K, V>>,
 }
 
+#[allow(dead_code)]
 impl<K, V> HashTree<K, V>
 where
     K: Hash + Eq,
@@ -27,7 +28,9 @@ where
         self.childs.get(k)
     }
 
+    #[allow(dead_code)]
     pub fn contains_key(&self, k: &K) -> bool {
+    #[allow(dead_code)]
         self.childs.contains_key(k)
     }
 

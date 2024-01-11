@@ -15,10 +15,12 @@ impl<V> VecTree<V>
         }
     }
     
+    #[allow(dead_code)]
     pub fn node(&self, i: usize) -> Option<&VecTree<V>> {
         self.childs.get(i)
     }
 
+    #[allow(dead_code)]
     pub fn node_mut(&mut self, i: usize) -> Option<&mut VecTree<V>> {
         self.childs.get_mut(i)
     }
