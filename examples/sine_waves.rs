@@ -3,10 +3,9 @@
 
 use rand::Rng;
 use std::f64::consts::PI;
-use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
-use rust_data_inspector_signals::{Signals, Signal, SignalSample};
+use rust_data_inspector_signals::{Signals,  SignalSample};
 use rust_data_inspector::datainspector;
 
 // When compiling natively:
@@ -25,7 +24,7 @@ fn main() -> eframe::Result<()> {
             rng.gen::<f64>() * 10.0 + 5.0,
             rng.gen(),
             rng.gen::<f64>() * PI * 2.0,
-            rng.gen::<f32>() * 100f32 + 2f32,
+            rng.gen::<f32>() * 5f32 + 2f32,
             Some(start),
         );
     };
@@ -79,9 +78,9 @@ pub fn new_signal_producer(
     rate: f32,
     start_time: Option<Instant>,
 ) -> JoinHandle<()> {
-    let (id, mut sample_sender) = signals.add_signal(name).unwrap();
+    let (_, mut sample_sender) = signals.add_signal(name).unwrap();
 
-    let handle = thread::spawn(move || {
+    thread::spawn(move || {
         let period_ms = u64::max((1000f32 / rate) as u64, 1);
 
         let start = start_time.unwrap_or(Instant::now());
@@ -100,7 +99,5 @@ pub fn new_signal_producer(
                 break;
             }
         }
-    });
-
-    handle
+    })
 }
