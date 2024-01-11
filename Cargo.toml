@@ -12,6 +12,7 @@ eframe = { version = "0.25.0", default-features = false, features = [
     "persistence",
 ] }
 egui = "0.25.0"
+egui_plot = "0.25.0"
 egui_tiles = "0.6.0"
 rand = "0.8.5"
 rust-data-inspector-signals = {path = "rust-data-inspector-signals"}

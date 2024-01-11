@@ -1,16 +1,17 @@
-use std::{collections::{HashMap, HashSet, BTreeSet}, vec};
+use std::{collections::{HashMap,  BTreeSet}, default};
 
 use egui::Color32;
 use rust_data_inspector_signals::{SignalID, Signals};
 
-use crate::utils::VecTree;
+use crate::{utils::VecTree, layout::tiles::Pane};
 
 #[derive(Debug)]
 pub struct DataInspectorState {
     pub x_axis_mode: XAxisMode,
     pub plot_x_width: f64,
-    pub selected_tile: usize,
-    pub signal_state: HashMap<SignalID, SignalState>
+    pub selected_tile: u64,
+    pub tile_counter: u64,
+    pub signal_state: HashMap<SignalID, SignalState>,
 }
 
 impl DataInspectorState {
@@ -19,18 +20,25 @@ impl DataInspectorState {
             x_axis_mode: XAxisMode::default(),
             plot_x_width: 60.0,
             selected_tile: 0,
+            tile_counter: 0,
             signal_state: signals.get_signals().iter().map(|(id, _)| (*id, SignalState {
                 color: Color32::BLUE,
                 used_by_tile: BTreeSet::new()
-            })).collect()
+            })).collect(),
         }
+    }
+
+    pub fn get_tile_id_and_increment(&mut self) -> u64 {
+        let id = self.tile_counter;
+        self.tile_counter += 1;
+        id
     }
 }
 
 #[derive(Debug)]
 pub struct SignalState {
     pub color: Color32,
-    pub used_by_tile: BTreeSet<usize>
+    pub used_by_tile: BTreeSet<u64>
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]

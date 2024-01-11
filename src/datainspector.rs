@@ -2,7 +2,9 @@ use std::ops::RangeInclusive;
 
 use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
+use crate::layout::tiles::{Pane, TilesBehavior};
 use crate::state::{DataInspectorState, SignalData, XAxisMode};
+use egui_tiles::Tile;
 use rust_data_inspector_signals::Signals;
 
 use egui::{Frame, ScrollArea};
@@ -10,6 +12,7 @@ use egui::{Frame, ScrollArea};
 pub struct DataInspector {
     signals: SignalData,
     state: DataInspectorState,
+    tile_tree: egui_tiles::Tree<Pane>,
     frame_history: FrameHistory,
 }
 
@@ -17,16 +20,31 @@ impl DataInspector {
     /// Called once before the first frame.
     #[allow(unused)]
     pub fn run(cc: &eframe::CreationContext<'_>, signals: Signals) -> Self {
-        let state = DataInspectorState::new(&signals);
-
-        let mut plotter_app = DataInspector {
+        let mut state = DataInspectorState::new(&signals);
+        let tile_tree = create_tile_tree(&mut state);
+        DataInspector {
             signals: SignalData::new(signals),
             state,
             frame_history: FrameHistory::default(),
-        };
-
-        plotter_app
+            tile_tree,
+        }
     }
+}
+
+fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
+    let mut tiles = egui_tiles::Tiles::default();
+
+    let mut tabs = vec![];
+    tabs.push({
+        let child = tiles.insert_pane(Pane {
+            id: state.get_tile_id_and_increment(),
+        });
+        tiles.insert_horizontal_tile([child].to_vec())
+    });
+
+    let root = tiles.insert_tab_tile(tabs);
+
+    egui_tiles::Tree::new("display_tree", root, tiles)
 }
 
 impl eframe::App for DataInspector {
@@ -71,6 +89,7 @@ impl eframe::App for DataInspector {
         });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            ui.label(format!("Active tile: {:X}", self.state.selected_tile));
             SignalListUI::new().ui(ui, &self.signals, &mut self.state);
             // match self.plot_layout.tree.find_active_focused() {
             //     Some((_, tab)) => {
@@ -96,17 +115,45 @@ impl eframe::App for DataInspector {
         egui::CentralPanel::default()
             .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |ui| {
-                ScrollArea::vertical().show(ui, |ui| {
-                    ui.label(format!("{:#?}", self.signals.signal_tree));
-                });
-                // The central panel the region left after adding TopPanel's and SidePanel's
-                // self.num_points = 1usize;
+                let mut behavior = TilesBehavior::new(&mut self.state, &mut self.signals);
+                self.tile_tree.ui(&mut behavior, ui);
 
-                // self.plot_layout.ui(ui, &self.signals);
+                let close_tab = behavior.close_tab;
+
+                if let Some(tile_id) = behavior.add_child_to.take() {
+                    let id = self.state.get_tile_id_and_increment();
+                    self.state.selected_tile = id;
+
+                    let new_child = self.tile_tree.tiles.insert_pane(Pane { id });
+
+                    if let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) =
+                        self.tile_tree.tiles.get_mut(tile_id)
+                    {
+                        tabs.add_child(new_child);
+                        tabs.set_active(new_child);
+                    }
+                }
+
+                if let Some(tile_id) = close_tab {
+                    // When there is only one pane left, we have the pane tile + its container
+                    // We don't want to delete it
+                    if self.tile_tree.tiles.len() > 2 {
+                        if let Some(Tile::Pane(pane)) = self.tile_tree.tiles.get(tile_id) {
+                            for signal in self.state.signal_state.values_mut() {
+                                if signal.used_by_tile.contains(&pane.id) {
+                                    signal.used_by_tile.remove(&pane.id);
+                                }
+                            }
+                        }
+
+                        self.tile_tree.remove_recursively(tile_id);
+                    }
+                }
             });
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        let _ = storage;
         // eframe::set_value(storage, "plot_layout", &self.plot_layout);
         // eframe::set_value(storage, "invalidate_storage", &self.invalidate_storage);
     }
