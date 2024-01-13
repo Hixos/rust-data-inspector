@@ -13,7 +13,7 @@ impl SignalListUI {
     }
 
     pub fn ui(&self, ui: &mut egui::Ui, signals: &SignalData, state: &mut DataInspectorState) {
-        Self::ui_impl(ui, &signals.signal_tree, state);
+        Self::ui_impl(ui, signals.signal_tree(), state);
     }
 
     fn ui_impl(ui: &mut egui::Ui, node: &VecTree<SignalNode>, state: &mut DataInspectorState) {

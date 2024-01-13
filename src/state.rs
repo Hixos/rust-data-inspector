@@ -74,8 +74,11 @@ pub struct SignalNode {
 }
 
 pub struct SignalData {
-    pub signals: Signals,
-    pub signal_tree: VecTree<SignalNode>,
+    signals: Signals,
+    signal_tree: VecTree<SignalNode>,
+
+    time_span: Option<[f64; 2]>,
+    all_signals_not_empty: bool,
 }
 
 impl SignalData {
@@ -85,6 +88,51 @@ impl SignalData {
         SignalData {
             signals,
             signal_tree,
+            time_span: None,
+            all_signals_not_empty: false
+        }
+    }
+
+    pub fn signals(&self) -> &Signals {
+        &self.signals
+    }
+
+    pub fn signal_tree(&self) -> &VecTree<SignalNode> {
+        &self.signal_tree
+    }
+
+    pub fn time_span(&self) -> Option<[f64; 2]> {
+        self.time_span
+    }
+
+    pub fn update(&mut self) {
+        self.signals.update();
+
+        for sig in self.signals.get_signals().values() {
+            let mut min = self.time_span.map(|v| v[0]);
+            let mut max = self.time_span.map(|v| v[1]);
+
+            // Update initial time only until we have considered all signals
+            if !self.all_signals_not_empty {
+                self.all_signals_not_empty = true; // Tentatively set this to true
+                if let Some(&first) = sig.time().first() {
+                    if min.is_none() || first < min.unwrap() {
+                        min = Some(first);
+                    } else {
+                        self.all_signals_not_empty = false;
+                    }
+                }
+            }
+
+            if let Some(&last) = sig.time().last() {
+                if max.is_none() || last > max.unwrap() {
+                    max = Some(last);
+                }
+            }
+
+            if min.is_some() {
+                self.time_span = Some([min.unwrap(), max.unwrap()]);
+            }
         }
     }
 

@@ -50,7 +50,7 @@ fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
 
 impl eframe::App for DataInspector {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.signals.signals.update();
+        self.signals.update();
 
         self.frame_history
             .on_new_frame(ctx.input(|i| i.time), frame.info().cpu_usage);
@@ -85,7 +85,6 @@ impl eframe::App for DataInspector {
         });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.label(format!("Active tile: {:X}", self.state.selected_tile));
             SignalListUI::new().ui(ui, &self.signals, &mut self.state);
             // match self.plot_layout.tree.find_active_focused() {
             //     Some((_, tab)) => {
@@ -104,7 +103,9 @@ impl eframe::App for DataInspector {
                 egui::warn_if_debug_build(ui);
                 self.frame_history.ui(ui);
                 ui.label(format!("FPS: {}", self.frame_history.fps()));
-                // ui.label(format!("Num points: {}", self.num_points));
+
+                ui.label(format!("Active tile: {:X}", self.state.selected_tile));
+                ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
             });
         });
 
