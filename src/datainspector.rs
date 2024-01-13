@@ -120,19 +120,6 @@ impl eframe::App for DataInspector {
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             SignalListUI::new().ui(ui, &self.signals, &mut self.state);
-            // match self.plot_layout.tree.find_active_focused() {
-            //     Some((_, tab)) => {
-            //         SignalList::new().ui(ui, &mut self.signals, &mut tab.signals);
-            //     }
-            //     None => {
-            //         SignalList::new().ui(
-            //             ui,
-            //             &mut self.signals,
-            //             &mut TabSignals::new(),
-            //         );
-            //     }
-            // }
-
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 egui::warn_if_debug_build(ui);
                 self.frame_history.ui(ui);
