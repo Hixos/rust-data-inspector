@@ -148,8 +148,8 @@ impl SignalData {
                 }
             }
 
-            if min.is_some() {
-                self.time_span = Some([min.unwrap(), max.unwrap()]);
+            if let (Some(min), Some(max)) = (min, max) {
+                self.time_span = Some([min, max]);
             }
         }
     }
