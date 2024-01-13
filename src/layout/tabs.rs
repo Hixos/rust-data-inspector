@@ -51,21 +51,17 @@ impl Pane {
             .auto_bounds(Vec2b::FALSE)
             .show(ui, |plot_ui| {
                 for (id, signal) in signals.signals().get_signals() {
-                    if state
-                        .signal_state
-                        .get(id)
-                        .unwrap()
-                        .used_by_tile
-                        .contains(&self.pane_id)
-                    {
-                        let points = signal
-                            .time()
-                            .iter()
-                            .zip(signal.data().iter())
-                            .map(|(t, v)| [*t, *v])
-                            .collect::<PlotPoints>();
+                    if let Some(state) = state.signal_state.get(id) {
+                        if state.used_by_tile.contains(&self.pane_id) {
+                            let points = signal
+                                .time()
+                                .iter()
+                                .zip(signal.data().iter())
+                                .map(|(t, v)| [*t, *v])
+                                .collect::<PlotPoints>();
 
-                        plot_ui.line(Line::new(points));
+                            plot_ui.line(Line::new(points).color(state.color));
+                        }
                     }
                 }
 

@@ -6,7 +6,7 @@ use egui_dock::DockState;
 use rust_data_inspector_signals::{SignalID, Signals};
 use serde::{Deserialize, Serialize};
 
-use crate::{layout::tabs::Pane, utils::VecTree};
+use crate::{layout::tabs::Pane, utils::{VecTree, auto_color}};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataInspectorState {
@@ -26,11 +26,12 @@ impl DataInspectorState {
             signal_state: signals
                 .get_signals()
                 .iter()
-                .map(|(id, _)| {
+                .enumerate()
+                .map(|(i, (id, _))| {
                     (
                         *id,
                         SignalState {
-                            color: Color32::BLUE,
+                            color: auto_color(i),
                             used_by_tile: BTreeSet::new(),
                         },
                     )
