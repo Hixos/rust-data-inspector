@@ -1,7 +1,7 @@
-use egui::{Event, Vec2, Vec2b, Id};
-use egui_plot::{Line, PlotBounds,  PlotPoints};
-use egui_tiles::{SimplificationOptions, Tile, TileId};
-use serde::{Serialize, Deserialize};
+use egui::{Event, Vec2, Vec2b};
+use egui_dock::{NodeIndex, SurfaceIndex};
+use egui_plot::{Line, PlotBounds, PlotPoints};
+use serde::{Deserialize, Serialize};
 
 use crate::state::{DataInspectorState, SignalData, XAxisMode};
 
@@ -10,16 +10,14 @@ const PLOT_MARGIN_PC: f64 = 0.01;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Pane {
-    pub id: u64,
-    pub plot_id: Option<Id>
+    pub pane_id: u64,
 }
-
 
 impl Pane {
     pub fn new(pane_id: u64) -> Self {
-        Pane { id: pane_id, plot_id: None }
+        Pane { pane_id }
     }
-    
+
     fn ui(
         &mut self,
         ui: &mut egui::Ui,
@@ -39,7 +37,7 @@ impl Pane {
             (scroll, i.pointer.primary_down(), i.modifiers)
         });
 
-        let response = egui_plot::Plot::new(format!("plot_{}", self.id))
+        egui_plot::Plot::new(format!("plot_{}", self.pane_id))
             .allow_drag(false)
             .allow_zoom(false)
             .allow_scroll(false)
@@ -58,7 +56,7 @@ impl Pane {
                         .get(id)
                         .unwrap()
                         .used_by_tile
-                        .contains(&self.id)
+                        .contains(&self.pane_id)
                     {
                         let points = signal
                             .time()
@@ -70,8 +68,6 @@ impl Pane {
                         plot_ui.line(Line::new(points));
                     }
                 }
-
-                let mut transformed = false;
 
                 let time_span = signals.time_span();
                 // Plot mode transformations
@@ -139,8 +135,6 @@ impl Pane {
                                 plot_ui.zoom_bounds_around_hovered(zoom_factor);
                             }
                         }
-
-                        transformed = true;
                     }
 
                     if pointer_down {
@@ -148,97 +142,46 @@ impl Pane {
                         if state.x_axis_mode != XAxisMode::Free {
                             pointer_translate.x = 0.0;
                         }
-                        // if self.lock_y {
-                        //     pointer_translate.y = 0.0;
-                        // }
+
                         plot_ui.translate_bounds(pointer_translate);
                     }
                 }
-
-                state.pane_state.get_mut(&self.id).unwrap().plot_transformed = transformed;
             });
-        if response.response.clicked()
-            || response.response.dragged()
-            || response.response.gained_focus()
-        {
-            state.selected_tile = self.id;
-        }
     }
 }
 
-pub struct TilesBehavior<'a> {
+pub struct TabViewer<'a> {
     state: &'a mut DataInspectorState,
     signals: &'a mut SignalData,
 
-    pub add_child_to: Option<TileId>,
-    pub close_tab: Option<TileId>,
-
     link_x_translated: bool,
+
+    pub added_nodes: Vec<(SurfaceIndex, NodeIndex)>,
 }
 
-impl<'a> TilesBehavior<'a> {
+impl<'a> TabViewer<'a> {
     pub fn new(state: &'a mut DataInspectorState, signals: &'a mut SignalData) -> Self {
-        TilesBehavior {
+        TabViewer {
             state,
             signals,
-            add_child_to: None,
-            close_tab: None,
             link_x_translated: false,
+            added_nodes: vec![],
         }
     }
 }
 
-impl<'a> egui_tiles::Behavior<Pane> for TilesBehavior<'a> {
-    fn tab_title_for_pane(&mut self, pane: &Pane) -> egui::WidgetText {
-        format!("Pane {}", pane.id).into()
+impl<'a> egui_dock::TabViewer for TabViewer<'a> {
+    type Tab = Pane;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        format!("Tab {}", tab.pane_id).into()
     }
 
-    fn pane_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        _tile_id: egui_tiles::TileId,
-        pane: &mut Pane,
-    ) -> egui_tiles::UiResponse {
-        pane.ui(ui, self.state, self.signals, &mut self.link_x_translated);
-        egui_tiles::UiResponse::None
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        tab.ui(ui, self.state, self.signals, &mut self.link_x_translated);
     }
 
-    fn on_tab_button(
-        &mut self,
-        tiles: &egui_tiles::Tiles<Pane>,
-        tile_id: TileId,
-        button_response: egui::Response,
-    ) -> egui::Response {
-        if button_response.triple_clicked() {
-            self.close_tab = Some(tile_id);
-        } else if button_response.clicked()
-            || button_response.dragged()
-            || button_response.gained_focus()
-        {
-            if let Some(Tile::Pane(pane)) = tiles.get(tile_id) {
-                self.state.selected_tile = pane.id;
-            }
-        }
-        button_response
-    }
-
-    fn top_bar_right_ui(
-        &mut self,
-        _tiles: &egui_tiles::Tiles<Pane>,
-        ui: &mut egui::Ui,
-        tile_id: egui_tiles::TileId,
-        _tabs: &egui_tiles::Tabs,
-        _scroll_offset: &mut f32,
-    ) {
-        if ui.button("+").clicked() {
-            self.add_child_to = Some(tile_id);
-        }
-    }
-
-    fn simplification_options(&self) -> egui_tiles::SimplificationOptions {
-        SimplificationOptions {
-            all_panes_must_have_tabs: true,
-            ..Default::default()
-        }
+    fn on_add(&mut self, surface: egui_dock::SurfaceIndex, node: egui_dock::NodeIndex) {
+        self.added_nodes.push((surface, node));
     }
 }

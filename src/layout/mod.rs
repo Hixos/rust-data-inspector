@@ -1,2 +1,2 @@
 pub(crate) mod signallist;
-pub(crate) mod tiles;
+pub(crate) mod tabs;

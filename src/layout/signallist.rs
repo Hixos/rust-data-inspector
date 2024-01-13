@@ -24,7 +24,7 @@ impl SignalListUI {
             let col = &mut signal_state.color;
             let mut srgb = [col.r(), col.g(), col.b()];
 
-            let selected = signal_state.used_by_tile.contains(&state.selected_tile);
+            let selected = signal_state.used_by_tile.contains(&state.selected_pane);
             let mut selected_mut = selected;
             ui.horizontal(|ui| {
                 ui.color_edit_button_srgb(&mut srgb);
@@ -34,9 +34,9 @@ impl SignalListUI {
             *col = Color32::from_rgb(srgb[0], srgb[1], srgb[2]);
             if selected_mut != selected { // Value was changed
                 if selected_mut {
-                    signal_state.used_by_tile.insert(state.selected_tile);
+                    signal_state.used_by_tile.insert(state.selected_pane);
                 }else{
-                    signal_state.used_by_tile.remove(&state.selected_tile);
+                    signal_state.used_by_tile.remove(&state.selected_pane);
                 }
             }
         } else {

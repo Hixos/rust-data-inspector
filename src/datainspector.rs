@@ -1,8 +1,8 @@
 use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
-use crate::layout::tiles::{Pane, TilesBehavior};
-use crate::state::{DataInspectorState, SignalData, TileState, XAxisMode};
-use egui_tiles::Tile;
+use crate::layout::tabs::{Pane, TabViewer};
+use crate::state::{DataInspectorState, SignalData, TabState, XAxisMode};
+use egui_dock::{DockArea, Style};
 use rust_data_inspector_signals::Signals;
 
 use egui::Frame;
@@ -10,7 +10,7 @@ use egui::Frame;
 pub struct DataInspector {
     signals: SignalData,
     state: DataInspectorState,
-    tile_tree: egui_tiles::Tree<Pane>,
+    tab_state: TabState,
     frame_history: FrameHistory,
     reset: bool,
 }
@@ -19,59 +19,41 @@ impl DataInspector {
     /// Called once before the first frame.
     #[allow(unused)]
     pub fn run(cc: &eframe::CreationContext<'_>, signals: Signals) -> Self {
-
         // Load from storage, if available
-        let (state, tile_tree) = if let Some(storage) = cc.storage {
+        let (state, tab_state) = if let Some(storage) = cc.storage {
             let state = DataInspectorState::from_storage(storage, &signals);
-            let tile_tree = eframe::get_value::<egui_tiles::Tree<Pane>>(storage, "tile_tree");
+            let tab_state = eframe::get_value::<TabState>(storage, "tab_state");
 
-            if let (Some(state), Some(tile_tree)) = (state, tile_tree) {
-                (state, tile_tree)
+            if let (Some(state), Some(tab_state)) = (state, tab_state) {
+                (state, tab_state)
             } else {
                 let mut state = DataInspectorState::new(&signals);
-                let mut tile_tree = create_tile_tree(&mut state);
+                let mut tab_state = TabState::default();
 
-                (state, tile_tree)
+                (state, tab_state)
             }
         } else {
             let mut state = DataInspectorState::new(&signals);
-            let mut tile_tree = create_tile_tree(&mut state);
+            let mut tab_state = TabState::default();
 
-            (state, tile_tree)
+            (state, tab_state)
         };
 
         DataInspector {
             signals: SignalData::new(signals),
             state,
             frame_history: FrameHistory::default(),
-            tile_tree,
+            tab_state,
             reset: false,
         }
     }
 
     fn reset(&mut self) {
         self.state = DataInspectorState::new(self.signals.signals());
-        self.tile_tree = create_tile_tree(&mut self.state);
+        self.tab_state = TabState::default();
         self.frame_history = FrameHistory::default();
         self.reset = false;
     }
-}
-
-fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
-    let mut tiles = egui_tiles::Tiles::default();
-
-    let mut tabs = vec![];
-    let pane_id = state.get_pane_id_and_increment();
-    state.pane_state.insert(pane_id, TileState::default());
-
-    tabs.push({
-        let child = tiles.insert_pane(Pane::new(pane_id));
-        tiles.insert_horizontal_tile([child].to_vec())
-    });
-
-    let root = tiles.insert_tab_tile(tabs);
-
-    egui_tiles::Tree::new("display_tree", root, tiles)
 }
 
 impl eframe::App for DataInspector {
@@ -91,11 +73,14 @@ impl eframe::App for DataInspector {
         self.frame_history
             .on_new_frame(ctx.input(|i| i.time), frame.info().cpu_usage);
 
+        // Find last interfacted pane
+        if let Some((_, tab)) = self.tab_state.tree.find_active_focused() {
+            self.state.selected_pane = tab.pane_id;
+        }
+        
         ctx.request_repaint();
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-
             ui.horizontal(|ui| {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
@@ -125,7 +110,7 @@ impl eframe::App for DataInspector {
                 self.frame_history.ui(ui);
                 ui.label(format!("FPS: {}", self.frame_history.fps()));
 
-                ui.label(format!("Active tile: {:X}", self.state.selected_tile));
+                ui.label(format!("Active tile: {:X}", self.state.selected_pane));
                 ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
             });
         });
@@ -133,46 +118,26 @@ impl eframe::App for DataInspector {
         egui::CentralPanel::default()
             .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |ui| {
-                let mut behavior = TilesBehavior::new(&mut self.state, &mut self.signals);
-                self.tile_tree.ui(&mut behavior, ui);
+                let mut tabviewer = TabViewer::new(&mut self.state, &mut self.signals);
+                DockArea::new(&mut self.tab_state.tree)
+                    .show_add_buttons(true)
+                    .style(Style::from_egui(ctx.style().as_ref()))
+                    .show_inside(ui, &mut tabviewer);
 
-                let close_tab = behavior.close_tab;
-
-                if let Some(tile_id) = behavior.add_child_to.take() {
-                    let id = self.state.get_pane_id_and_increment();
-                    self.state.pane_state.insert(id, TileState::default());
-                    self.state.selected_tile = id;
-
-                    let new_child = self.tile_tree.tiles.insert_pane(Pane::new(id));
-
-                    if let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) =
-                        self.tile_tree.tiles.get_mut(tile_id)
-                    {
-                        tabs.add_child(new_child);
-                        tabs.set_active(new_child);
-                    }
-                }
-
-                if let Some(tile_id) = close_tab {
-                    // When there is only one pane left, we have the pane tile + its container
-                    // We don't want to delete it
-                    if self.tile_tree.tiles.len() > 2 {
-                        if let Some(Tile::Pane(pane)) = self.tile_tree.tiles.get(tile_id) {
-                            for signal in self.state.signal_state.values_mut() {
-                                if signal.used_by_tile.contains(&pane.id) {
-                                    signal.used_by_tile.remove(&pane.id);
-                                }
-                            }
-                            self.state.pane_state.remove(&pane.id);
-                        }
-                        self.tile_tree.remove_recursively(tile_id);
-                    }
+                for (surface, node) in tabviewer.added_nodes.drain(..) {
+                    self.tab_state
+                        .tree
+                        .set_focused_node_and_surface((surface, node));
+                    self.tab_state
+                        .tree
+                        .push_to_focused_leaf(Pane::new(self.tab_state.tab_counter));
+                    self.tab_state.tab_counter += 1;
                 }
             });
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         self.state.to_storage(storage);
-        eframe::set_value(storage, "tile_tree", &self.tile_tree);
+        eframe::set_value(storage, "tab_state", &self.tab_state);
     }
 }

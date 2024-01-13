@@ -2,20 +2,19 @@ use std::collections::{BTreeSet, HashMap};
 
 use eframe::Storage;
 use egui::Color32;
+use egui_dock::{DockArea, DockState};
 use rust_data_inspector_signals::{SignalID, Signals};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::VecTree;
+use crate::{layout::tabs::Pane, utils::VecTree};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataInspectorState {
     pub x_axis_mode: XAxisMode,
     pub link_x: bool,
 
-    pub selected_tile: u64,
-    pub tile_counter: u64,
+    pub selected_pane: u64,
     pub signal_state: HashMap<SignalID, SignalState>,
-    pub pane_state: HashMap<u64, TileState>,
 }
 
 impl DataInspectorState {
@@ -23,8 +22,7 @@ impl DataInspectorState {
         DataInspectorState {
             x_axis_mode: XAxisMode::default(),
             link_x: true,
-            selected_tile: 0,
-            tile_counter: 0,
+            selected_pane: 0,
             signal_state: signals
                 .get_signals()
                 .iter()
@@ -38,7 +36,6 @@ impl DataInspectorState {
                     )
                 })
                 .collect(),
-            pane_state: HashMap::new(),
         }
     }
 
@@ -57,18 +54,25 @@ impl DataInspectorState {
     pub fn to_storage(&self, storage: &mut dyn Storage) {
         eframe::set_value(storage, "state", self);
     }
+}
 
-    pub fn get_pane_id_and_increment(&mut self) -> u64 {
-        let id = self.tile_counter;
-        self.tile_counter += 1;
-        id
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TabState {
+    pub tree: DockState<Pane>,
+    pub tab_counter: u64,
+}
+
+impl Default for TabState {
+    fn default() -> Self {
+        let tree = DockState::new(vec![Pane::new(1)]);
+        TabState {
+            tree,
+            tab_counter: 2,
+        }
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct TileState {
-    pub plot_transformed: bool,
-}
+impl TabState {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignalState {
