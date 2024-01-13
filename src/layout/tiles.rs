@@ -13,7 +13,13 @@ pub struct Pane {
 }
 
 impl Pane {
-    fn ui(&mut self, ui: &mut egui::Ui, state: &mut DataInspectorState, signals: &mut SignalData) {
+    fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        state: &mut DataInspectorState,
+        signals: &mut SignalData,
+        link_x_translated: &mut bool,
+    ) {
         let (scroll, pointer_down, modifiers) = ui.input(|i| {
             let scroll = i.events.iter().find_map(|e| match e {
                 Event::MouseWheel {
@@ -26,18 +32,20 @@ impl Pane {
             (scroll, i.pointer.primary_down(), i.modifiers)
         });
 
-        let mut plot = egui_plot::Plot::new(format!("plot_{}", self.id));
-        let response = plot
+        let response = egui_plot::Plot::new(format!("plot_{}", self.id))
             .allow_drag(false)
             .allow_zoom(false)
             .allow_scroll(false)
             .allow_double_click_reset(false)
+            .link_cursor("main", true, false)
+            .link_axis(
+                "main",
+                state.link_x && state.x_axis_mode != XAxisMode::Fit,
+                false,
+            )
             .auto_bounds(Vec2b::FALSE)
             .show(ui, |plot_ui| {
-                let mut left_most: Option<f64> = None;
-                let mut right_most: Option<f64> = None;
-
-                for (id, signal) in signals.signals.get_signals() {
+                for (id, signal) in signals.signals().get_signals() {
                     if state
                         .signal_state
                         .get(id)
@@ -45,18 +53,6 @@ impl Pane {
                         .used_by_tile
                         .contains(&self.id)
                     {
-                        if let Some(last) = signal.time().last() {
-                            if right_most.is_none() || right_most.unwrap() < *last {
-                                right_most = Some(*last);
-                            }
-                        }
-
-                        if let Some(first) = signal.time().first() {
-                            if left_most.is_none() || left_most.unwrap() > *first {
-                                left_most = Some(*first);
-                            }
-                        }
-
                         let points = signal
                             .time()
                             .iter()
@@ -70,27 +66,35 @@ impl Pane {
 
                 let mut transformed = false;
 
+                let time_span = signals.time_span();
                 // Plot mode transformations
                 match state.x_axis_mode {
                     XAxisMode::Follow => {
                         let bounds = plot_ui.plot_bounds();
-                        let dx = right_most.unwrap_or(DEFAULT_PLOT_WIDTH) - bounds.max()[0]
+                        let dx = time_span.map(|s| s[1]).unwrap_or(DEFAULT_PLOT_WIDTH)
+                            - bounds.max()[0]
                             + bounds.width() * PLOT_MARGIN_PC;
-                        plot_ui.translate_bounds(Vec2 {
-                            x: dx as f32,
-                            y: 0.0,
-                        });
+
+                        // To avoid artifacts, only one plot per frame can perform the translation when axis are linked
+                        if !(state.link_x && *link_x_translated) {
+                            plot_ui.translate_bounds(Vec2 {
+                                x: dx as f32,
+                                y: 0.0,
+                            });
+                            *link_x_translated = true;
+                        }
                     }
 
                     XAxisMode::Fit => {
                         let bounds = plot_ui.plot_bounds();
                         let bounds = PlotBounds::from_min_max(
                             [
-                                left_most.unwrap_or(0.0) - bounds.width() * PLOT_MARGIN_PC,
+                                time_span.map(|s| s[0]).unwrap_or(0.0)
+                                    - bounds.width() * PLOT_MARGIN_PC,
                                 bounds.min()[1],
                             ],
                             [
-                                right_most.unwrap_or(DEFAULT_PLOT_WIDTH)
+                                time_span.map(|s| s[1]).unwrap_or(DEFAULT_PLOT_WIDTH)
                                     + bounds.width() * PLOT_MARGIN_PC,
                                 bounds.max()[1],
                             ],
@@ -161,6 +165,8 @@ pub struct TilesBehavior<'a> {
 
     pub add_child_to: Option<TileId>,
     pub close_tab: Option<TileId>,
+
+    link_x_translated: bool,
 }
 
 impl<'a> TilesBehavior<'a> {
@@ -170,6 +176,7 @@ impl<'a> TilesBehavior<'a> {
             signals,
             add_child_to: None,
             close_tab: None,
+            link_x_translated: false,
         }
     }
 }
@@ -185,7 +192,7 @@ impl<'a> egui_tiles::Behavior<Pane> for TilesBehavior<'a> {
         _tile_id: egui_tiles::TileId,
         pane: &mut Pane,
     ) -> egui_tiles::UiResponse {
-        pane.ui(ui, self.state, self.signals);
+        pane.ui(ui, self.state, self.signals, &mut self.link_x_translated);
         egui_tiles::UiResponse::None
     }
 
