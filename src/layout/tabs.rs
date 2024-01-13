@@ -9,13 +9,13 @@ const DEFAULT_PLOT_WIDTH: f64 = 30.0;
 const PLOT_MARGIN_PC: f64 = 0.01;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Pane {
+pub struct Tab {
     pub pane_id: u64,
 }
 
-impl Pane {
-    pub fn new(pane_id: u64) -> Self {
-        Pane { pane_id }
+impl Tab {
+    pub fn new(tab_id: u64) -> Self {
+        Tab { pane_id: tab_id }
     }
 
     fn ui(
@@ -168,7 +168,7 @@ impl<'a> TabViewer<'a> {
 }
 
 impl<'a> egui_dock::TabViewer for TabViewer<'a> {
-    type Tab = Pane;
+    type Tab = Tab;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         format!("Tab {}", tab.pane_id).into()

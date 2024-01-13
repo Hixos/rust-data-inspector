@@ -1,6 +1,6 @@
 use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
-use crate::layout::tabs::{Pane, TabViewer};
+use crate::layout::tabs::{Tab, TabViewer};
 use crate::state::{DataInspectorState, SignalData, TabState, XAxisMode};
 use egui_dock::{DockArea, Style};
 use rust_data_inspector_signals::Signals;
@@ -132,7 +132,7 @@ impl eframe::App for DataInspector {
                         .set_focused_node_and_surface((surface, node));
                     self.tab_state
                         .tree
-                        .push_to_focused_leaf(Pane::new(self.tab_state.tab_counter));
+                        .push_to_focused_leaf(Tab::new(self.tab_state.tab_counter));
                     self.tab_state.tab_counter += 1;
                 }
             });

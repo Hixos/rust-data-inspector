@@ -7,7 +7,7 @@ use rust_data_inspector_signals::{SignalID, Signals};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    layout::tabs::Pane,
+    layout::tabs::Tab,
     utils::{auto_color, VecTree},
 };
 
@@ -62,13 +62,13 @@ impl DataInspectorState {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TabState {
-    pub tree: DockState<Pane>,
+    pub tree: DockState<Tab>,
     pub tab_counter: u64,
 }
 
 impl Default for TabState {
     fn default() -> Self {
-        let tree = DockState::new(vec![Pane::new(1)]);
+        let tree = DockState::new(vec![Tab::new(1)]);
         TabState {
             tree,
             tab_counter: 2,
