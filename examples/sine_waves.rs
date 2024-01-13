@@ -35,9 +35,9 @@ fn main() -> eframe::Result<()> {
     add_signal("/a/c/s1");
     add_signal("/a/c/s2");
     add_signal("/b/s1");
-    add_signal("/b/s2");
+    // add_signal("/b/s2");
     add_signal("/b/c/s1");
-    add_signal("/s1");
+    // add_signal("/s1");
     add_signal("/s2");
 
     eframe::run_native(

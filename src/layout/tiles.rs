@@ -1,13 +1,14 @@
-use egui::{vec2, Event, Sense, Stroke, TextStyle, Vec2, Vec2b};
-use egui_plot::{Line, PlotBounds, PlotPoint, PlotPoints, VPlacement};
+use egui::{Event, Vec2, Vec2b};
+use egui_plot::{Line, PlotBounds,  PlotPoints};
 use egui_tiles::{SimplificationOptions, Tile, TileId};
+use serde::{Serialize, Deserialize};
 
 use crate::state::{DataInspectorState, SignalData, XAxisMode};
 
 const DEFAULT_PLOT_WIDTH: f64 = 30.0;
 const PLOT_MARGIN_PC: f64 = 0.01;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Pane {
     pub id: u64,
 }

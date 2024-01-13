@@ -1,11 +1,13 @@
 use std::collections::{BTreeSet, HashMap};
 
+use eframe::Storage;
 use egui::Color32;
 use rust_data_inspector_signals::{SignalID, Signals};
+use serde::{Deserialize, Serialize};
 
 use crate::utils::VecTree;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DataInspectorState {
     pub x_axis_mode: XAxisMode,
     pub link_x: bool,
@@ -40,6 +42,22 @@ impl DataInspectorState {
         }
     }
 
+    pub fn from_storage(storage: &dyn Storage, signals: &Signals) -> Option<Self> {
+        if let Some(mut slf) = eframe::get_value::<Self>(storage, "state") {
+            // Remove state of signals that are not present anymore
+            slf.signal_state
+                .retain(|id, _| signals.get_signals().contains_key(id));
+
+            Some(slf)
+        } else {
+            None
+        }
+    }
+
+    pub fn to_storage(&self, storage: &mut dyn Storage) {
+        eframe::set_value(storage, "state", self);
+    }
+
     pub fn get_pane_id_and_increment(&mut self) -> u64 {
         let id = self.tile_counter;
         self.tile_counter += 1;
@@ -47,18 +65,18 @@ impl DataInspectorState {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TileState {
     pub plot_transformed: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SignalState {
     pub color: Color32,
     pub used_by_tile: BTreeSet<u64>,
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub enum XAxisMode {
     #[default]
     Fit,
@@ -89,7 +107,7 @@ impl SignalData {
             signals,
             signal_tree,
             time_span: None,
-            all_signals_not_empty: false
+            all_signals_not_empty: false,
         }
     }
 

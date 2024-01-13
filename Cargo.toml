@@ -16,6 +16,7 @@ egui_plot = "0.25.0"
 egui_tiles = "0.6.0"
 rand = "0.8.5"
 rust-data-inspector-signals = {path = "rust-data-inspector-signals"}
+serde = "1.0.195"
 thiserror = "1.0.56"
 
 [workspace]

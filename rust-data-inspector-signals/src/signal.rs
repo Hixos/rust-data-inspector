@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{channel, Receiver, SendError, Sender};
 
 use regex::Regex;
+use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
 pub struct Signal {
@@ -45,7 +46,7 @@ impl Signal {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct SignalID {
     id: u64,
 }

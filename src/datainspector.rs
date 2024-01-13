@@ -1,7 +1,7 @@
 use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
 use crate::layout::tiles::{Pane, TilesBehavior};
-use crate::state::{DataInspectorState, SignalData, XAxisMode, TileState};
+use crate::state::{DataInspectorState, SignalData, TileState, XAxisMode};
 use egui_tiles::Tile;
 use rust_data_inspector_signals::Signals;
 
@@ -12,20 +12,48 @@ pub struct DataInspector {
     state: DataInspectorState,
     tile_tree: egui_tiles::Tree<Pane>,
     frame_history: FrameHistory,
+    reset: bool,
 }
 
 impl DataInspector {
     /// Called once before the first frame.
     #[allow(unused)]
     pub fn run(cc: &eframe::CreationContext<'_>, signals: Signals) -> Self {
-        let mut state = DataInspectorState::new(&signals);
-        let tile_tree = create_tile_tree(&mut state);
+
+        // Load from storage, if available
+        let (state, tile_tree) = if let Some(storage) = cc.storage {
+            let state = DataInspectorState::from_storage(storage, &signals);
+            let tile_tree = eframe::get_value::<egui_tiles::Tree<Pane>>(storage, "tile_tree");
+
+            if let (Some(state), Some(tile_tree)) = (state, tile_tree) {
+                (state, tile_tree)
+            } else {
+                let mut state = DataInspectorState::new(&signals);
+                let mut tile_tree = create_tile_tree(&mut state);
+
+                (state, tile_tree)
+            }
+        } else {
+            let mut state = DataInspectorState::new(&signals);
+            let mut tile_tree = create_tile_tree(&mut state);
+
+            (state, tile_tree)
+        };
+
         DataInspector {
             signals: SignalData::new(signals),
             state,
             frame_history: FrameHistory::default(),
             tile_tree,
+            reset: false,
         }
+    }
+
+    fn reset(&mut self) {
+        self.state = DataInspectorState::new(self.signals.signals());
+        self.tile_tree = create_tile_tree(&mut self.state);
+        self.frame_history = FrameHistory::default();
+        self.reset = false;
     }
 }
 
@@ -37,9 +65,7 @@ fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
     state.pane_state.insert(pane_id, TileState::default());
 
     tabs.push({
-        let child = tiles.insert_pane(Pane {
-            id: pane_id,
-        });
+        let child = tiles.insert_pane(Pane { id: pane_id });
         tiles.insert_horizontal_tile([child].to_vec())
     });
 
@@ -50,6 +76,16 @@ fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
 
 impl eframe::App for DataInspector {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        if self.reset {
+            ctx.memory_mut(|mem| *mem = Default::default());
+
+            self.reset();
+
+            if let Some(storage) = frame.storage_mut() {
+                self.save(storage);
+            }
+        }
+
         self.signals.update();
 
         self.frame_history
@@ -63,13 +99,11 @@ impl eframe::App for DataInspector {
             ui.horizontal(|ui| {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
-                        if ui.button("Reset memory & close").clicked() {
-                            ui.ctx().memory_mut(|mem| *mem = Default::default());
-                            // self.invalidate_storage = true;
-                            // frame.close()
+                        if ui.button("Reset").clicked() {
+                            self.reset = true;
                         }
                         if ui.button("Quit").clicked() {
-                            // frame.close();
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
                 });
@@ -143,7 +177,7 @@ impl eframe::App for DataInspector {
                                 }
                             }
                             self.state.pane_state.remove(&pane.id);
-                    }
+                        }
                         self.tile_tree.remove_recursively(tile_id);
                     }
                 }
@@ -151,8 +185,7 @@ impl eframe::App for DataInspector {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let _ = storage;
-        // eframe::set_value(storage, "plot_layout", &self.plot_layout);
-        // eframe::set_value(storage, "invalidate_storage", &self.invalidate_storage);
+        self.state.to_storage(storage);
+        eframe::set_value(storage, "tile_tree", &self.tile_tree);
     }
 }
