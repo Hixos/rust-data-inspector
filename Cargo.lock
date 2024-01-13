@@ -553,6 +553,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a159fffebf052f79d1fd26d48e68906a21fec2fce808f7c0a982ec14ed506be"
 dependencies = [
  "egui",
+ "serde",
 ]
 
 [[package]]

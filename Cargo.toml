@@ -13,7 +13,7 @@ eframe = { version = "0.25.0", default-features = false, features = [
 ] }
 egui = "0.25.0"
 egui_dock = { version = "0.10.0", features = ["serde"] }
-egui_plot = "0.25.0"
+egui_plot = { version = "0.25.0", features = ["serde"] }
 rand = "0.8.5"
 rust-data-inspector-signals = {path = "rust-data-inspector-signals"}
 serde = "1.0.195"
