@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use eframe::Storage;
 use egui::Color32;
-use egui_dock::{DockArea, DockState};
+use egui_dock::DockState;
 use rust_data_inspector_signals::{SignalID, Signals};
 use serde::{Deserialize, Serialize};
 
