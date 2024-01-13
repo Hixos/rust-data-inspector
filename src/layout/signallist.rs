@@ -17,8 +17,8 @@ impl SignalListUI {
     }
 
     fn ui_impl(ui: &mut egui::Ui, node: &VecTree<SignalNode>, state: &mut DataInspectorState) {
-        if node.count_children() == 0 {
-            let id = node.v.signal.unwrap();
+        if node.children.is_empty() {
+            let id = node.value.signal.unwrap();
             let signal_state = state.signal_state.get_mut(&id).unwrap();
 
             let col = &mut signal_state.color;
@@ -28,7 +28,7 @@ impl SignalListUI {
             let mut selected_mut = selected;
             ui.horizontal(|ui| {
                 ui.color_edit_button_srgb(&mut srgb);
-                ui.toggle_value(&mut selected_mut, node.v.name.clone());
+                ui.toggle_value(&mut selected_mut, node.value.name.clone());
             });
 
             *col = Color32::from_rgb(srgb[0], srgb[1], srgb[2]);
@@ -40,10 +40,10 @@ impl SignalListUI {
                 }
             }
         } else {
-            CollapsingHeader::new(node.v.name.clone())
-                .id_source(node.v.path.clone())
+            CollapsingHeader::new(node.value.name.clone())
+                .id_source(node.value.path.clone())
                 .show(ui, |ui| {
-                    for child in node.nodes_iter() {
+                    for child in node.children.iter() {
                         Self::ui_impl(ui, child, state);
                     }
                 });
