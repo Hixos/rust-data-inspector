@@ -25,7 +25,7 @@ impl DataInspectorState {
         DataInspectorState {
             x_axis_mode: XAxisMode::default(),
             link_x: true,
-            selected_pane: 0,
+            selected_pane: 1,
             signal_state: signals
                 .get_signals()
                 .iter()
