@@ -1,4 +1,4 @@
-use egui::{Event, Vec2, Vec2b};
+use egui::{Event, Vec2, Vec2b, Id};
 use egui_plot::{Line, PlotBounds,  PlotPoints};
 use egui_tiles::{SimplificationOptions, Tile, TileId};
 use serde::{Serialize, Deserialize};
@@ -11,9 +11,15 @@ const PLOT_MARGIN_PC: f64 = 0.01;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Pane {
     pub id: u64,
+    pub plot_id: Option<Id>
 }
 
+
 impl Pane {
+    pub fn new(pane_id: u64) -> Self {
+        Pane { id: pane_id, plot_id: None }
+    }
+    
     fn ui(
         &mut self,
         ui: &mut egui::Ui,

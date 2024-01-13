@@ -65,7 +65,7 @@ fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
     state.pane_state.insert(pane_id, TileState::default());
 
     tabs.push({
-        let child = tiles.insert_pane(Pane { id: pane_id });
+        let child = tiles.insert_pane(Pane::new(pane_id));
         tiles.insert_horizontal_tile([child].to_vec())
     });
 
@@ -143,7 +143,7 @@ impl eframe::App for DataInspector {
                     self.state.pane_state.insert(id, TileState::default());
                     self.state.selected_tile = id;
 
-                    let new_child = self.tile_tree.tiles.insert_pane(Pane { id });
+                    let new_child = self.tile_tree.tiles.insert_pane(Pane::new(id));
 
                     if let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) =
                         self.tile_tree.tiles.get_mut(tile_id)
