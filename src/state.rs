@@ -1,44 +1,61 @@
-use std::{collections::{HashMap,  BTreeSet}, default};
+use std::collections::{BTreeSet, HashMap};
 
 use egui::Color32;
 use rust_data_inspector_signals::{SignalID, Signals};
 
-use crate::{utils::VecTree, layout::tiles::Pane};
+use crate::utils::VecTree;
 
 #[derive(Debug)]
 pub struct DataInspectorState {
     pub x_axis_mode: XAxisMode,
-    pub plot_x_width: f64,
+    pub link_x: bool,
+
     pub selected_tile: u64,
     pub tile_counter: u64,
     pub signal_state: HashMap<SignalID, SignalState>,
+    pub pane_state: HashMap<u64, TileState>,
 }
 
 impl DataInspectorState {
     pub fn new(signals: &Signals) -> Self {
         DataInspectorState {
             x_axis_mode: XAxisMode::default(),
-            plot_x_width: 60.0,
+            link_x: true,
             selected_tile: 0,
             tile_counter: 0,
-            signal_state: signals.get_signals().iter().map(|(id, _)| (*id, SignalState {
-                color: Color32::BLUE,
-                used_by_tile: BTreeSet::new()
-            })).collect(),
+            signal_state: signals
+                .get_signals()
+                .iter()
+                .map(|(id, _)| {
+                    (
+                        *id,
+                        SignalState {
+                            color: Color32::BLUE,
+                            used_by_tile: BTreeSet::new(),
+                        },
+                    )
+                })
+                .collect(),
+            pane_state: HashMap::new(),
         }
     }
 
-    pub fn get_tile_id_and_increment(&mut self) -> u64 {
+    pub fn get_pane_id_and_increment(&mut self) -> u64 {
         let id = self.tile_counter;
         self.tile_counter += 1;
         id
     }
 }
 
+#[derive(Debug, Default)]
+pub struct TileState {
+    pub plot_transformed: bool,
+}
+
 #[derive(Debug)]
 pub struct SignalState {
     pub color: Color32,
-    pub used_by_tile: BTreeSet<u64>
+    pub used_by_tile: BTreeSet<u64>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
@@ -99,30 +116,24 @@ impl SignalData {
                 path.push('/');
 
                 if !node_contains(node, part.as_str()) {
-                    node.push(
-                        SignalNode {
-                            name: part.clone(),
-                            path: path.clone(),
-                            signal: None,
-                        },
-                    );
+                    node.push(SignalNode {
+                        name: part.clone(),
+                        path: path.clone(),
+                        signal: None,
+                    });
                 }
                 node = node.nodes_iter_mut().last().unwrap();
             }
             // Assumption: Signal names are legal and a signal does not have any subnodes
             let last = parts.last().unwrap();
             path.push_str(last);
-            node.push(
-                SignalNode {
-                    name: last.to_string(),
-                    path,
-                    signal: Some(*id),
-                },
-            );
+            node.push(SignalNode {
+                name: last.to_string(),
+                path,
+                signal: Some(*id),
+            });
         }
 
         root
     }
-
-    
 }

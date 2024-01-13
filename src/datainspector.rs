@@ -1,13 +1,11 @@
-use std::ops::RangeInclusive;
-
 use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
 use crate::layout::tiles::{Pane, TilesBehavior};
-use crate::state::{DataInspectorState, SignalData, XAxisMode};
+use crate::state::{DataInspectorState, SignalData, XAxisMode, TileState};
 use egui_tiles::Tile;
 use rust_data_inspector_signals::Signals;
 
-use egui::{Frame, ScrollArea};
+use egui::Frame;
 
 pub struct DataInspector {
     signals: SignalData,
@@ -35,9 +33,12 @@ fn create_tile_tree(state: &mut DataInspectorState) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 
     let mut tabs = vec![];
+    let pane_id = state.get_pane_id_and_increment();
+    state.pane_state.insert(pane_id, TileState::default());
+
     tabs.push({
         let child = tiles.insert_pane(Pane {
-            id: state.get_tile_id_and_increment(),
+            id: pane_id,
         });
         tiles.insert_horizontal_tile([child].to_vec())
     });
@@ -73,17 +74,12 @@ impl eframe::App for DataInspector {
                     });
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add(
-                        egui::DragValue::new(&mut self.state.plot_x_width)
-                            .speed(1.0)
-                            .suffix(" s")
-                            .clamp_range(RangeInclusive::new(0.001f64, std::f64::INFINITY)),
-                    );
-                    ui.label("Width:");
-
                     ui.selectable_value(&mut self.state.x_axis_mode, XAxisMode::Follow, "Follow");
                     ui.selectable_value(&mut self.state.x_axis_mode, XAxisMode::Fit, "Fit");
                     ui.selectable_value(&mut self.state.x_axis_mode, XAxisMode::Free, "Free");
+                    ui.label("Plot mode:");
+
+                    ui.toggle_value(&mut self.state.link_x, "Link X");
                 });
             });
         });
@@ -121,7 +117,8 @@ impl eframe::App for DataInspector {
                 let close_tab = behavior.close_tab;
 
                 if let Some(tile_id) = behavior.add_child_to.take() {
-                    let id = self.state.get_tile_id_and_increment();
+                    let id = self.state.get_pane_id_and_increment();
+                    self.state.pane_state.insert(id, TileState::default());
                     self.state.selected_tile = id;
 
                     let new_child = self.tile_tree.tiles.insert_pane(Pane { id });
@@ -144,8 +141,8 @@ impl eframe::App for DataInspector {
                                     signal.used_by_tile.remove(&pane.id);
                                 }
                             }
-                        }
-
+                            self.state.pane_state.remove(&pane.id);
+                    }
                         self.tile_tree.remove_recursively(tile_id);
                     }
                 }
