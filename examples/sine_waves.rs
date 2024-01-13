@@ -24,7 +24,7 @@ fn main() -> eframe::Result<()> {
             rng.gen::<f64>() * 10.0 + 5.0,
             rng.gen(),
             rng.gen::<f64>() * PI * 2.0,
-            rng.gen::<f32>() * 30f32 + 2f32,
+            rng.gen::<f32>() * 60f32 + 2f32,
             Some(start),
         );
     };
