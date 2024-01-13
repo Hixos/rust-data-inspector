@@ -1,3 +1,5 @@
+#![allow(dead_code)] 
+
 pub mod datainspector;
 
 pub(crate) mod framehistory;
