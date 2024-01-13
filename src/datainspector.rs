@@ -119,8 +119,10 @@ impl eframe::App for DataInspector {
             .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |ui| {
                 let mut tabviewer = TabViewer::new(&mut self.state, &mut self.signals);
+                let show_close_button = self.tab_state.tree.iter_all_tabs().count() > 1;
                 DockArea::new(&mut self.tab_state.tree)
                     .show_add_buttons(true)
+                    .show_close_buttons(show_close_button)
                     .style(Style::from_egui(ctx.style().as_ref()))
                     .show_inside(ui, &mut tabviewer);
 
