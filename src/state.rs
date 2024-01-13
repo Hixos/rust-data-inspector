@@ -6,7 +6,10 @@ use egui_dock::DockState;
 use rust_data_inspector_signals::{SignalID, Signals};
 use serde::{Deserialize, Serialize};
 
-use crate::{layout::tabs::Pane, utils::{VecTree, auto_color}};
+use crate::{
+    layout::tabs::Pane,
+    utils::{auto_color, VecTree},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataInspectorState {
@@ -160,14 +163,19 @@ impl SignalData {
     }
 
     fn grow_signal_tree(signals: &Signals) -> VecTree<SignalNode> {
-        fn node_contains(node: &VecTree<SignalNode>, part: &str) -> bool {
-            for n in node.nodes_iter() {
-                if n.v.name == part {
-                    return true;
-                }
+        fn insert_ordered(
+            node: &mut VecTree<SignalNode>,
+            elem: SignalNode,
+        ) -> Option<&mut VecTree<SignalNode>> {
+            if let Err(index) = node
+                .children
+                .binary_search_by_key(&elem.name, |v| v.value.name.clone())
+            {
+                node.children.insert(index, VecTree::new(elem));
+                node.children.get_mut(index)
+            } else {
+                None
             }
-
-            false
         }
 
         let mut root = VecTree::new(SignalNode {
@@ -186,23 +194,33 @@ impl SignalData {
                 path.push_str(&part);
                 path.push('/');
 
-                if !node_contains(node, part.as_str()) {
-                    node.push(SignalNode {
-                        name: part.clone(),
-                        path: path.clone(),
-                        signal: None,
-                    });
+                if let Some(index) = node.children.iter().position(|n| n.value.name == part) {
+                    node = node.children.get_mut(index).unwrap();
+                } else {
+                    node = insert_ordered(
+                        node,
+                        SignalNode {
+                            name: part.clone(),
+                            path: path.clone(),
+                            signal: None,
+                        },
+                    )
+                    .unwrap();
                 }
-                node = node.nodes_iter_mut().last().unwrap();
             }
-            // Assumption: Signal names are legal and a signal does not have any subnodes
+
             let last = parts.last().unwrap();
             path.push_str(last);
-            node.push(SignalNode {
-                name: last.to_string(),
-                path,
-                signal: Some(*id),
-            });
+
+            insert_ordered(
+                node,
+                SignalNode {
+                    name: last.to_string(),
+                    path,
+                    signal: Some(*id),
+                },
+            )
+            .expect("Duplicate signal in signal tree");
         }
 
         root
