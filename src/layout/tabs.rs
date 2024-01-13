@@ -1,6 +1,6 @@
 use egui::{Event, Vec2, Vec2b};
 use egui_dock::{NodeIndex, SurfaceIndex};
-use egui_plot::{Line, PlotBounds, PlotPoints};
+use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{DataInspectorState, SignalData, XAxisMode};
@@ -49,6 +49,7 @@ impl Pane {
                 false,
             )
             .auto_bounds(Vec2b::FALSE)
+            .legend(Legend::default())
             .show(ui, |plot_ui| {
                 for (id, signal) in signals.signals().get_signals() {
                     if let Some(state) = state.signal_state.get(id) {
@@ -60,7 +61,7 @@ impl Pane {
                                 .map(|(t, v)| [*t, *v])
                                 .collect::<PlotPoints>();
 
-                            plot_ui.line(Line::new(points).color(state.color));
+                            plot_ui.line(Line::new(points).color(state.color).name(signal.name()));
                         }
                     }
                 }
