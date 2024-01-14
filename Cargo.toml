@@ -18,6 +18,7 @@ rand = "0.8.5"
 rust-data-inspector-signals = {path = "rust-data-inspector-signals"}
 serde = "1.0.195"
 thiserror = "1.0.56"
+downsample_rs = { git = "https://github.com/predict-idlab/tsdownsample" }
 
 [workspace]
 members = ["rust-data-inspector-signals"]
