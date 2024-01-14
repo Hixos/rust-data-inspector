@@ -1,1 +1,0 @@
-- sort signals when constructing signal_tree
