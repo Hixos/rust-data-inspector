@@ -194,10 +194,10 @@ impl Tab {
             return None;
         }
 
-        let mut range_i = cache.map(|v| v.last_visible_range.clone()).unwrap_or(0..0);
+        let mut range_i = cache.map(|v| v.last_visible_range.clone()).unwrap_or(0..1);
 
         let left_t = *signal.time().get(range_i.start).unwrap();
-        let right_t = *signal.time().get(range_i.end).unwrap();
+        let right_t = *signal.time().get(range_i.end - 1).unwrap();
 
         let left_bound = plot_bounds.min()[0];
         let right_bound = plot_bounds.max()[0];
@@ -227,7 +227,7 @@ impl Tab {
 
         if right_t < right_bound {
             for (i, &t) in signal.time().iter().enumerate().skip(range_i.end) {
-                range_i.end = i;
+                range_i.end = i + 1;
                 if t > right_bound {
                     break;
                 }
@@ -241,7 +241,7 @@ impl Tab {
                 .skip(signal.time().len() - range_i.end)
             {
                 if t > right_bound {
-                    range_i.end = i;
+                    range_i.end = i + 1;
                 } else {
                     break;
                 }
