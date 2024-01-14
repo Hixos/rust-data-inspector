@@ -1,6 +1,7 @@
 # Rust Data Inspector
 
-A flexible library to plot time series in real time.
+A flexible library to plot time series in real time.  
+Writte in Rust using [egui](https://github.com/emilk/egui).
 
 ![Rust Data Inspector](docs/screenshot.png "Rust Data Inspector")
 
