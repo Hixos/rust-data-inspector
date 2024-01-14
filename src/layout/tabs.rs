@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::HashMap, ops::Range};
+use std::{collections::HashMap, ops::Range};
 
 use downsample_rs::lttb_with_x;
 use egui::{Event, Vec2, Vec2b};
