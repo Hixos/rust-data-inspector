@@ -51,7 +51,7 @@ pub struct SignalID {
     id: u64,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SignalSample {
     pub time: f64,
     pub value: f64,
