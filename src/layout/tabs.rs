@@ -74,8 +74,8 @@ impl Tab {
                         .x as usize;
 
                 for (id, signal) in signals.signals().get_signals() {
-                    if let Some(state) = state.signal_state.get(id) {
-                        if state.used_by_tile.contains(&self.pane_id) {
+                    if let Some(sig_state) = state.signal_state.get(id) {
+                        if sig_state.used_by_tile.contains(&self.pane_id) {
                             let range = Self::find_visible_range(
                                 signal,
                                 &plot_ui.plot_bounds(),
@@ -91,15 +91,25 @@ impl Tab {
                                 );
                                 let time = signal.time().get(range.clone()).unwrap();
                                 let data = signal.data().get(range.clone()).unwrap();
-                                let downsampled_indices = lttb_with_x(time, data, plot_rect_width * 2);
+                                let points = if time.len() > (plot_rect_width as f32 * 2.5) as usize
+                                {
+                                    let downsampled_indices =
+                                        lttb_with_x(time, data, plot_rect_width * 2);
 
-                                let points = downsampled_indices
-                                    .into_iter()
-                                    .map(|i| [time[i], data[i]])
-                                    .collect::<PlotPoints>();
+                                    downsampled_indices
+                                        .into_iter()
+                                        .map(|i| [time[i], data[i]])
+                                        .collect::<PlotPoints>()
+                                } else {
+                                    time.iter()
+                                        .zip(data.iter())
+                                        .map(|(&t, &v)| [t, v])
+                                        .collect::<PlotPoints>()
+                                };
 
-                                plot_ui
-                                    .line(Line::new(points).color(state.color).name(signal.name()));
+                                plot_ui.line(
+                                    Line::new(points).color(sig_state.color).name(signal.name()),
+                                );
                             }
                         }
                     }
