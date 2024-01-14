@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{cmp::max, collections::HashMap, ops::Range};
 
+use downsample_rs::lttb_with_x;
 use egui::{Event, Vec2, Vec2b};
 use egui_dock::{NodeIndex, SurfaceIndex};
 use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
@@ -21,7 +22,7 @@ pub struct Tab {
 
 #[derive(Debug, Default, Clone)]
 struct SignalPlotCache {
-    last_visible_range: (usize, usize),
+    last_visible_range: Range<usize>,
 }
 
 impl Tab {
@@ -65,6 +66,13 @@ impl Tab {
             .auto_bounds(Vec2b::FALSE)
             .legend(Legend::default())
             .show(ui, |plot_ui| {
+                let plot_rect_width = plot_ui
+                    .screen_from_plot(plot_ui.plot_bounds().max().into())
+                    .x as usize
+                    - plot_ui
+                        .screen_from_plot(plot_ui.plot_bounds().min().into())
+                        .x as usize;
+
                 for (id, signal) in signals.signals().get_signals() {
                     if let Some(state) = state.signal_state.get(id) {
                         if state.used_by_tile.contains(&self.pane_id) {
@@ -78,17 +86,16 @@ impl Tab {
                                 self.cache.insert(
                                     *id,
                                     SignalPlotCache {
-                                        last_visible_range: range,
+                                        last_visible_range: range.clone(),
                                     },
                                 );
+                                let time = signal.time().get(range.clone()).unwrap();
+                                let data = signal.data().get(range.clone()).unwrap();
+                                let downsampled_indices = lttb_with_x(time, data, plot_rect_width * 2);
 
-                                let points = signal
-                                    .time()
-                                    .iter()
-                                    .zip(signal.data().iter())
-                                    .skip(range.0)
-                                    .take(range.1 - range.0)
-                                    .map(|(t, v)| [*t, *v])
+                                let points = downsampled_indices
+                                    .into_iter()
+                                    .map(|i| [time[i], data[i]])
                                     .collect::<PlotPoints>();
 
                                 plot_ui
@@ -182,23 +189,23 @@ impl Tab {
         signal: &Signal,
         plot_bounds: &PlotBounds,
         cache: Option<&SignalPlotCache>,
-    ) -> Option<(usize, usize)> {
+    ) -> Option<Range<usize>> {
         if signal.time().is_empty() {
             return None;
         }
 
-        let (mut left_i, mut right_i) = cache.map(|v| v.last_visible_range).unwrap_or((0, 0));
+        let mut range_i = cache.map(|v| v.last_visible_range.clone()).unwrap_or(0..0);
 
-        let left_t = *signal.time().get(left_i).unwrap();
-        let right_t = *signal.time().get(right_i).unwrap();
+        let left_t = *signal.time().get(range_i.start).unwrap();
+        let right_t = *signal.time().get(range_i.end).unwrap();
 
         let left_bound = plot_bounds.min()[0];
         let right_bound = plot_bounds.max()[0];
 
         if left_t < left_bound {
-            for (i, &t) in signal.time().iter().enumerate().skip(left_i) {
+            for (i, &t) in signal.time().iter().enumerate().skip(range_i.start) {
                 if t < left_bound {
-                    left_i = i;
+                    range_i.start = i;
                 } else {
                     break;
                 }
@@ -209,9 +216,9 @@ impl Tab {
                 .iter()
                 .enumerate()
                 .rev()
-                .skip(signal.time().len() - left_i)
+                .skip(signal.time().len() - range_i.start)
             {
-                left_i = i;
+                range_i.start = i;
                 if t < left_bound {
                     break;
                 }
@@ -219,8 +226,8 @@ impl Tab {
         }
 
         if right_t < right_bound {
-            for (i, &t) in signal.time().iter().enumerate().skip(right_i) {
-                right_i = i;
+            for (i, &t) in signal.time().iter().enumerate().skip(range_i.end) {
+                range_i.end = i;
                 if t > right_bound {
                     break;
                 }
@@ -231,17 +238,17 @@ impl Tab {
                 .iter()
                 .enumerate()
                 .rev()
-                .skip(signal.time().len() - right_i)
+                .skip(signal.time().len() - range_i.end)
             {
                 if t > right_bound {
-                    right_i = i;
+                    range_i.end = i;
                 } else {
                     break;
                 }
             }
         }
 
-        Some((left_i, right_i))
+        Some(range_i.start..range_i.end)
     }
 }
 
