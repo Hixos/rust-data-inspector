@@ -1,4 +1,3 @@
-mod hashtree;
 mod vectree;
 mod color;
 
