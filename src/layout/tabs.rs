@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use egui::{Event, Vec2, Vec2b};
 use egui_dock::{NodeIndex, SurfaceIndex};
 use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
+use rust_data_inspector_signals::{Signal, SignalID};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{DataInspectorState, SignalData, XAxisMode};
@@ -11,11 +14,22 @@ const PLOT_MARGIN_PC: f64 = 0.01;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Tab {
     pub pane_id: u64,
+
+    #[serde(skip)]
+    cache: HashMap<SignalID, SignalPlotCache>,
+}
+
+#[derive(Debug, Default, Clone)]
+struct SignalPlotCache {
+    last_visible_range: (usize, usize),
 }
 
 impl Tab {
     pub fn new(tab_id: u64) -> Self {
-        Tab { pane_id: tab_id }
+        Tab {
+            pane_id: tab_id,
+            cache: HashMap::new(),
+        }
     }
 
     fn ui(
@@ -54,14 +68,33 @@ impl Tab {
                 for (id, signal) in signals.signals().get_signals() {
                     if let Some(state) = state.signal_state.get(id) {
                         if state.used_by_tile.contains(&self.pane_id) {
-                            let points = signal
-                                .time()
-                                .iter()
-                                .zip(signal.data().iter())
-                                .map(|(t, v)| [*t, *v])
-                                .collect::<PlotPoints>();
+                            let range = Self::find_visible_range(
+                                signal,
+                                &plot_ui.plot_bounds(),
+                                self.cache.get(id),
+                            );
 
-                            plot_ui.line(Line::new(points).color(state.color).name(signal.name()));
+                            if let Some(range) = range {
+                                println!("{:?}     {}", range, signal.time().len());
+                                self.cache.insert(
+                                    *id,
+                                    SignalPlotCache {
+                                        last_visible_range: range,
+                                    },
+                                );
+
+                                let points = signal
+                                    .time()
+                                    .iter()
+                                    .zip(signal.data().iter())
+                                    .skip(range.0)
+                                    .take(range.1 - range.0)
+                                    .map(|(t, v)| [*t, *v])
+                                    .collect::<PlotPoints>();
+
+                                plot_ui
+                                    .line(Line::new(points).color(state.color).name(signal.name()));
+                            }
                         }
                     }
                 }
@@ -144,6 +177,72 @@ impl Tab {
                     }
                 }
             });
+    }
+
+    fn find_visible_range(
+        signal: &Signal,
+        plot_bounds: &PlotBounds,
+        cache: Option<&SignalPlotCache>,
+    ) -> Option<(usize, usize)> {
+        if signal.time().is_empty() {
+            return None;
+        }
+
+        let (mut left_i, mut right_i) = cache.map(|v| v.last_visible_range).unwrap_or((0, 0));
+
+        let left_t = *signal.time().get(left_i).unwrap();
+        let right_t = *signal.time().get(right_i).unwrap();
+
+        let left_bound = plot_bounds.min()[0];
+        let right_bound = plot_bounds.max()[0];
+
+        if left_t < left_bound {
+            for (i, &t) in signal.time().iter().enumerate().skip(left_i) {
+                if t < left_bound {
+                    left_i = i;
+                } else {
+                    break;
+                }
+            }
+        } else {
+            for (i, &t) in signal
+                .time()
+                .iter()
+                .enumerate()
+                .rev()
+                .skip(signal.time().len() - left_i)
+            {
+                left_i = i;
+                if t < left_bound {
+                    break;
+                }
+            }
+        }
+
+        if right_t < right_bound {
+            for (i, &t) in signal.time().iter().enumerate().skip(right_i) {
+                right_i = i;
+                if t > right_bound {
+                    break;
+                }
+            }
+        } else {
+            for (i, &t) in signal
+                .time()
+                .iter()
+                .enumerate()
+                .rev()
+                .skip(signal.time().len() - right_i)
+            {
+                if t > right_bound {
+                    right_i = i;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        Some((left_i, right_i))
     }
 }
 
