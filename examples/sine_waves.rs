@@ -11,6 +11,8 @@ use rust_data_inspector::datainspector;
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    use rust_data_inspector::datainspector::DataInspector;
+
     let native_options = eframe::NativeOptions::default();
 
     let mut signals = Signals::default();
@@ -40,11 +42,7 @@ fn main() -> eframe::Result<()> {
     add_signal("/s1");
     add_signal("/s2");
 
-    eframe::run_native(
-        "Plotter",
-        native_options,
-        Box::new(|cc| Box::new(datainspector::DataInspector::run(cc, signals))),
-    )
+    DataInspector::run_native("plotter", signals)
 }
 
 pub fn new_signal_producer(

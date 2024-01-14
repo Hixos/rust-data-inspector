@@ -2,6 +2,7 @@ use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
 use crate::layout::tabs::{Tab, TabViewer};
 use crate::state::{DataInspectorState, SignalData, TabState, XAxisMode};
+use eframe::NativeOptions;
 use egui_dock::{DockArea, Style};
 use rust_data_inspector_signals::Signals;
 
@@ -16,6 +17,14 @@ pub struct DataInspector {
 }
 
 impl DataInspector {
+    pub fn run_native(app_name: &str, signals: Signals) -> Result<(), eframe::Error>{
+        eframe::run_native(
+            app_name,
+            NativeOptions::default(),
+            Box::new(|cc| Box::new(DataInspector::run(cc, signals))),
+        )
+    }
+
     /// Called once before the first frame.
     #[allow(unused)]
     pub fn run(cc: &eframe::CreationContext<'_>, signals: Signals) -> Self {
@@ -77,7 +86,7 @@ impl eframe::App for DataInspector {
         if let Some((_, tab)) = self.tab_state.tree.find_active_focused() {
             self.state.selected_pane = tab.pane_id;
         }
-        
+
         ctx.request_repaint();
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
