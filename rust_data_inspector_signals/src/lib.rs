@@ -1,3 +1,3 @@
 mod signal;
 
-pub use signal::{Signal, SignalError, SignalID, SignalProducer, SignalSample, SignalSendError, Signals};
+pub use signal::{PlotSignal, PlotSignalError, PlotSignalID, PlotSignalProducer, PlotSignalSample, PlotSignalSendError, PlotSignals};

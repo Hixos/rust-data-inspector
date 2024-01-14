@@ -5,17 +5,14 @@ use rand::Rng;
 use std::f64::consts::PI;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
-use rust_data_inspector_signals::{Signals,  SignalSample};
-use rust_data_inspector::datainspector;
+use rust_data_inspector_signals::{PlotSignals,  PlotSignalSample};
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     use rust_data_inspector::datainspector::DataInspector;
 
-    let native_options = eframe::NativeOptions::default();
-
-    let mut signals = Signals::default();
+    let mut signals = PlotSignals::default();
 
     let start = Instant::now();
     let mut rng = rand::thread_rng();
@@ -46,7 +43,7 @@ fn main() -> eframe::Result<()> {
 }
 
 pub fn new_signal_producer(
-    signals: &mut Signals,
+    signals: &mut PlotSignals,
     name: &str,
     a: f64,
     f: f64,
@@ -67,7 +64,7 @@ pub fn new_signal_producer(
 
             let y = a * f64::sin(2f64 * PI * f * t + phi);
 
-            let res = sample_sender.send(SignalSample { time: t, value: y });
+            let res = sample_sender.send(PlotSignalSample { time: t, value: y });
 
             if res.is_ok() {
                 thread::sleep(Duration::from_millis(period_ms))

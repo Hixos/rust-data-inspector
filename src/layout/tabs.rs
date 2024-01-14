@@ -4,7 +4,7 @@ use downsample_rs::lttb_with_x;
 use egui::{Event, Vec2, Vec2b};
 use egui_dock::{NodeIndex, SurfaceIndex};
 use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
-use rust_data_inspector_signals::{Signal, SignalID};
+use rust_data_inspector_signals::{PlotSignal, PlotSignalID};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{DataInspectorState, SignalData, XAxisMode};
@@ -17,7 +17,7 @@ pub struct Tab {
     pub pane_id: u64,
 
     #[serde(skip)]
-    cache: HashMap<SignalID, SignalPlotCache>,
+    cache: HashMap<PlotSignalID, SignalPlotCache>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -196,7 +196,7 @@ impl Tab {
     }
 
     fn find_visible_range(
-        signal: &Signal,
+        signal: &PlotSignal,
         plot_bounds: &PlotBounds,
         cache: Option<&SignalPlotCache>,
     ) -> Option<Range<usize>> {

@@ -7,17 +7,17 @@ use regex::Regex;
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
-pub struct Signal {
-    id: SignalID,
+pub struct PlotSignal {
+    id: PlotSignalID,
     name: String,
 
     time: Vec<f64>,
     data: Vec<f64>,
 }
 
-impl Signal {
-    pub fn new(name: String, id: SignalID) -> Self {
-        Signal {
+impl PlotSignal {
+    pub fn new(name: String, id: PlotSignalID) -> Self {
+        PlotSignal {
             id,
             name,
             time: vec![],
@@ -25,7 +25,7 @@ impl Signal {
         }
     }
 
-    pub fn id(&self) -> SignalID {
+    pub fn id(&self) -> PlotSignalID {
         self.id
     }
 
@@ -47,31 +47,31 @@ impl Signal {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub struct SignalID {
+pub struct PlotSignalID {
     id: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct SignalSample {
+pub struct PlotSignalSample {
     pub time: f64,
     pub value: f64,
 }
 
 #[derive(Default)]
-pub struct Signals {
-    signals: HashMap<SignalID, Signal>,
-    receivers: HashMap<SignalID, Receiver<SignalSample>>,
+pub struct PlotSignals {
+    signals: HashMap<PlotSignalID, PlotSignal>,
+    receivers: HashMap<PlotSignalID, Receiver<PlotSignalSample>>,
 }
 
-impl Signals {
-    pub fn get_signals(&self) -> &HashMap<SignalID, Signal> {
+impl PlotSignals {
+    pub fn get_signals(&self) -> &HashMap<PlotSignalID, PlotSignal> {
         &self.signals
     }
 
     /// Returns the signal with the provided id.  
     /// Assumes that the SignalID was provided a call to add_signal of this instance.  
     /// Panics if a signal with the provided id is not found. This happens if the id belongs to another instance.
-    pub fn get_signal(&self, id: SignalID) -> &Signal {
+    pub fn get_signal(&self, id: PlotSignalID) -> &PlotSignal {
         self.signals.get(&id).unwrap()
     }
 
@@ -90,10 +90,10 @@ impl Signals {
     /// - `drone/sensors/press1` Error: Does not start with `/`  
     /// - `/drone/sensors/temp-bat` Error: illegal character `-`  
     /// - `/drone/sensors//current` Error: consecutive `/`  
-    pub fn add_signal(&mut self, name: &str) -> Result<(SignalID, SignalProducer), SignalError> {
+    pub fn add_signal(&mut self, name: &str) -> Result<(PlotSignalID, PlotSignalProducer), PlotSignalError> {
         self.validate_name(name)?;
 
-        let id = SignalID {
+        let id = PlotSignalID {
             id: Self::get_name_hash(name),
         };
 
@@ -103,10 +103,10 @@ impl Signals {
             panic!("Signal ID hash collision");
         }
 
-        self.signals.insert(id, Signal::new(name.to_string(), id));
+        self.signals.insert(id, PlotSignal::new(name.to_string(), id));
         self.receivers.insert(id, receiver);
 
-        Ok((id, SignalProducer { sender, id }))
+        Ok((id, PlotSignalProducer { sender, id }))
     }
 
     pub fn update(&mut self) {
@@ -132,17 +132,17 @@ impl Signals {
     }
 }
 
-impl Signals {
-    fn validate_name(&self, name: &str) -> Result<(), SignalError> {
+impl PlotSignals {
+    fn validate_name(&self, name: &str) -> Result<(), PlotSignalError> {
         if !name.starts_with('/') {
-            return Err(SignalError::NameError {
+            return Err(PlotSignalError::NameError {
                 name: name.to_string(),
                 msg: "Signal name must start with a `/`.".to_string(),
             });
         }
 
         if name.contains("//") {
-            return Err(SignalError::NameError {
+            return Err(PlotSignalError::NameError {
                 name: name.to_string(),
                 msg: "Signal name must not contain two or more consecutive `/`.".to_string(),
             });
@@ -151,7 +151,7 @@ impl Signals {
         let regex = Regex::new(r"^[\w\/]+$").unwrap();
 
         if !regex.is_match(name) {
-            return Err(SignalError::NameError {
+            return Err(PlotSignalError::NameError {
                 name: name.to_string(),
                 msg: "Signal name must contain only letters, numbers, underscore or `/`.".to_string(),
             });
@@ -160,7 +160,7 @@ impl Signals {
         // Check that the signal name is not a subpath of an existing signal
         for sig_name in self.signals.values().map(|sig| &sig.name) {
             if name.starts_with(sig_name) {
-                return Err(SignalError::NameError {
+                return Err(PlotSignalError::NameError {
                     name: name.to_string(),
                     msg: format!(
                         "Provided signal name is a subsignal of {sig_name}"
@@ -175,34 +175,34 @@ impl Signals {
 }
 
 #[derive(Debug, Error)]
-pub enum SignalError {
+pub enum PlotSignalError {
     #[error("Bad signal name: {msg}. Signal: '{name}'")]
     NameError { name: String, msg: String },
 }
 
 #[derive(Debug, Error)]
-pub struct SignalSendError<T> {
+pub struct PlotSignalSendError<T> {
     pub t: T,
 }
 
-impl<T> From<SendError<T>> for SignalSendError<T> {
+impl<T> From<SendError<T>> for PlotSignalSendError<T> {
     fn from(value: SendError<T>) -> Self {
         Self { t: value.0 }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct SignalProducer {
-    sender: Sender<SignalSample>,
-    id: SignalID,
+pub struct PlotSignalProducer {
+    sender: Sender<PlotSignalSample>,
+    id: PlotSignalID,
 }
 
-impl SignalProducer {
-    pub fn send(&mut self, sample: SignalSample) -> Result<(), SignalSendError<SignalSample>> {
+impl PlotSignalProducer {
+    pub fn send(&mut self, sample: PlotSignalSample) -> Result<(), PlotSignalSendError<PlotSignalSample>> {
         self.sender.send(sample).map_err(|e| e.into())
     }
 
-    pub fn id(&self) -> SignalID {
+    pub fn id(&self) -> PlotSignalID {
         self.id
     }
 }

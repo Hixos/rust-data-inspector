@@ -4,7 +4,7 @@ use crate::layout::tabs::{Tab, TabViewer};
 use crate::state::{DataInspectorState, SignalData, TabState, XAxisMode};
 use eframe::NativeOptions;
 use egui_dock::{DockArea, Style};
-use rust_data_inspector_signals::Signals;
+use rust_data_inspector_signals::PlotSignals;
 
 use egui::Frame;
 
@@ -17,7 +17,7 @@ pub struct DataInspector {
 }
 
 impl DataInspector {
-    pub fn run_native(app_name: &str, signals: Signals) -> Result<(), eframe::Error>{
+    pub fn run_native(app_name: &str, signals: PlotSignals) -> Result<(), eframe::Error>{
         eframe::run_native(
             app_name,
             NativeOptions::default(),
@@ -27,7 +27,7 @@ impl DataInspector {
 
     /// Called once before the first frame.
     #[allow(unused)]
-    pub fn run(cc: &eframe::CreationContext<'_>, signals: Signals) -> Self {
+    pub fn run(cc: &eframe::CreationContext<'_>, signals: PlotSignals) -> Self {
         // Load from storage, if available
         let (state, tab_state) = if let Some(storage) = cc.storage {
             let state = DataInspectorState::from_storage(storage, &signals);

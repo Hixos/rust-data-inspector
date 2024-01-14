@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap};
 use eframe::Storage;
 use egui::Color32;
 use egui_dock::DockState;
-use rust_data_inspector_signals::{SignalID, Signals};
+use rust_data_inspector_signals::{PlotSignalID, PlotSignals};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -17,7 +17,7 @@ pub struct DataInspectorState {
     pub link_x: bool,
 
     pub selected_pane: u64,
-    pub signal_state: HashMap<SignalID, SignalState>,
+    pub signal_state: HashMap<PlotSignalID, SignalState>,
 
     pub signal_color_counter: usize,
 
@@ -26,7 +26,7 @@ pub struct DataInspectorState {
 }
 
 impl DataInspectorState {
-    pub fn new(signals: &Signals) -> Self {
+    pub fn new(signals: &PlotSignals) -> Self {
         DataInspectorState {
             x_axis_mode: XAxisMode::default(),
             link_x: true,
@@ -50,7 +50,7 @@ impl DataInspectorState {
         }
     }
 
-    pub fn from_storage(storage: &dyn Storage, signals: &Signals) -> Option<Self> {
+    pub fn from_storage(storage: &dyn Storage, signals: &PlotSignals) -> Option<Self> {
         if let Some(mut slf) = eframe::get_value::<Self>(storage, "state") {
             // Remove state of signals that are not present anymore
             slf.signal_state
@@ -122,11 +122,11 @@ pub enum XAxisMode {
 pub struct SignalNode {
     pub name: String,
     pub path: String,
-    pub signal: Option<SignalID>,
+    pub signal: Option<PlotSignalID>,
 }
 
 pub struct SignalData {
-    signals: Signals,
+    signals: PlotSignals,
     signal_tree: VecTree<SignalNode>,
 
     time_span: Option<[f64; 2]>,
@@ -134,7 +134,7 @@ pub struct SignalData {
 }
 
 impl SignalData {
-    pub fn new(signals: Signals) -> Self {
+    pub fn new(signals: PlotSignals) -> Self {
         let signal_tree = Self::grow_signal_tree(&signals);
 
         SignalData {
@@ -145,7 +145,7 @@ impl SignalData {
         }
     }
 
-    pub fn signals(&self) -> &Signals {
+    pub fn signals(&self) -> &PlotSignals {
         &self.signals
     }
 
@@ -188,7 +188,7 @@ impl SignalData {
         }
     }
 
-    fn grow_signal_tree(signals: &Signals) -> VecTree<SignalNode> {
+    fn grow_signal_tree(signals: &PlotSignals) -> VecTree<SignalNode> {
         fn insert_ordered(
             node: &mut VecTree<SignalNode>,
             elem: SignalNode,
