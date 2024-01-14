@@ -18,6 +18,8 @@ pub struct DataInspectorState {
 
     pub selected_pane: u64,
     pub signal_state: HashMap<SignalID, SignalState>,
+
+    pub signal_color_counter: usize,
 }
 
 impl DataInspectorState {
@@ -40,6 +42,7 @@ impl DataInspectorState {
                     )
                 })
                 .collect(),
+            signal_color_counter: signals.get_signals().len(),
         }
     }
 
@@ -48,6 +51,23 @@ impl DataInspectorState {
             // Remove state of signals that are not present anymore
             slf.signal_state
                 .retain(|id, _| signals.get_signals().contains_key(id));
+
+            signals
+                .get_signals()
+                .iter()
+                .enumerate()
+                .for_each(|(i, (id, _))| {
+                    if !slf.signal_state.contains_key(id) {
+                        slf.signal_state.insert(
+                            *id,
+                            SignalState {
+                                color: auto_color(i + slf.signal_color_counter),
+                                used_by_tile: BTreeSet::new(),
+                            },
+                        );
+                        slf.signal_color_counter += 1;
+                    }
+                });
 
             Some(slf)
         } else {
