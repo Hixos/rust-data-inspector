@@ -1555,7 +1555,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-data-inspector"
+name = "rust_data_inspector"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
@@ -1565,7 +1565,7 @@ dependencies = [
  "egui_dock",
  "egui_plot",
  "rand",
- "rust-data-inspector-signals",
+ "rust_data_inspector_signals",
  "serde",
  "thiserror",
  "tracing-subscriber",
@@ -1574,7 +1574,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-data-inspector-signals"
+name = "rust_data_inspector_signals"
 version = "0.1.0"
 dependencies = [
  "regex",
