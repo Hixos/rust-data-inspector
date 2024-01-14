@@ -114,6 +114,11 @@ impl Signals {
             let receiver = self.receivers.get(id).unwrap();
 
             while let Ok(sample) = receiver.try_recv() {
+                if let Some(&last) = signal.time.last()  {
+                    if sample.time < last {
+                        panic!("Received sample in the past!");
+                    }
+                }
                 signal.time.push(sample.time);
                 signal.data.push(sample.value);
             }
