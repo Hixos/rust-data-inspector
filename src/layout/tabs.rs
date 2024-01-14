@@ -75,7 +75,6 @@ impl Tab {
                             );
 
                             if let Some(range) = range {
-                                println!("{:?}     {}", range, signal.time().len());
                                 self.cache.insert(
                                     *id,
                                     SignalPlotCache {
