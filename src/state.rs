@@ -20,6 +20,9 @@ pub struct DataInspectorState {
     pub signal_state: HashMap<SignalID, SignalState>,
 
     pub signal_color_counter: usize,
+
+    #[serde(skip)]
+    pub debug_info: DebugInfo
 }
 
 impl DataInspectorState {
@@ -43,6 +46,7 @@ impl DataInspectorState {
                 })
                 .collect(),
             signal_color_counter: signals.get_signals().len(),
+            debug_info: DebugInfo::default()
         }
     }
 
@@ -96,7 +100,9 @@ impl Default for TabState {
     }
 }
 
-impl TabState {}
+#[derive(Debug, Default, Clone)]
+pub struct DebugInfo {
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignalState {
