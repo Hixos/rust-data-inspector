@@ -1,0 +1,125 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'rust_data_inspector_signals'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=rust_data_inspector_signals"
+                ],
+                "filter": {
+                    "name": "rust_data_inspector_signals",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'rust_data_inspector_app'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rust_data_inspector_app",
+                    "--package=rust_data_inspector_app"
+                ],
+                "filter": {
+                    "name": "rust_data_inspector_app",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "-f",
+                "/home/luca/code/skyward/gemini-logs-python/logs/main/log60_Boardcore_LSM6DSRXData.csv",
+                "-t",
+                "0"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'rust_data_inspector_app'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=rust_data_inspector_app",
+                    "--package=rust_data_inspector_app"
+                ],
+                "filter": {
+                    "name": "rust_data_inspector_app",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'rust_data_inspector'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=rust_data_inspector"
+                ],
+                "filter": {
+                    "name": "rust_data_inspector",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'sine_waves'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=sine_waves",
+                    "--package=rust_data_inspector"
+                ],
+                "filter": {
+                    "name": "sine_waves",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'sine_waves'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=sine_waves",
+                    "--package=rust_data_inspector"
+                ],
+                "filter": {
+                    "name": "sine_waves",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

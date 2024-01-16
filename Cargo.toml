@@ -15,10 +15,10 @@ egui = "0.25.0"
 egui_dock = { version = "0.10.0", features = ["serde"] }
 egui_plot = { version = "0.25.0", features = ["serde"] }
 rand = "0.8.5"
-rust_data_inspector_signals = {path = "rust_data_inspector_signals"}
+rust_data_inspector_signals = { path = "rust_data_inspector_signals" }
 serde = "1.0.195"
 thiserror = "1.0.56"
-downsample_rs = { git = "https://github.com/hixos/tsdownsample"}
+downsample_rs = { git = "https://github.com/hixos/tsdownsample" }
 
 [features]
 # Enables AVX512 and NEON support (requires nightly rustc) (see https://github.com/jvdd/argminmax)
@@ -26,7 +26,7 @@ nightly_simd = ["downsample_rs/nightly_simd"]
 
 
 [workspace]
-members = ["rust_data_inspector_signals"]
+members = ["rust_data_inspector_signals", "rust_data_inspector_app"]
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
