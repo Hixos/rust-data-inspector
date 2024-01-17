@@ -119,7 +119,7 @@ impl eframe::App for DataInspector {
                 self.frame_history.ui(ui);
                 ui.label(format!("FPS: {}", self.frame_history.fps()));
 
-                ui.label(format!("Active tile: {:X}", self.state.selected_pane));
+                ui.label(format!("All signals active: {}", self.signals.all_signals_have_data));
                 ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
             });
         });

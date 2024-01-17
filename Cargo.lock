@@ -1627,6 +1627,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rdi-plot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rust_data_inspector",
+ "rust_data_inspector_signals",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1713,16 +1723,6 @@ dependencies = [
  "tracing-subscriber",
  "tracing-wasm",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "rust_data_inspector_app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "rust_data_inspector",
- "rust_data_inspector_signals",
 ]
 
 [[package]]

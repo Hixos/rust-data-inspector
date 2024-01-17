@@ -1,5 +1,5 @@
 [package]
-name = "rust_data_inspector_app"
+name = "rdi-plot"
 version = "0.1.0"
 edition = "2021"
 

@@ -22,7 +22,7 @@ pub struct DataInspectorState {
     pub signal_color_counter: usize,
 
     #[serde(skip)]
-    pub debug_info: DebugInfo
+    pub debug_info: DebugInfo,
 }
 
 impl DataInspectorState {
@@ -46,7 +46,7 @@ impl DataInspectorState {
                 })
                 .collect(),
             signal_color_counter: signals.get_signals().len(),
-            debug_info: DebugInfo::default()
+            debug_info: DebugInfo::default(),
         }
     }
 
@@ -101,8 +101,7 @@ impl Default for TabState {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct DebugInfo {
-}
+pub struct DebugInfo {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignalState {
@@ -130,7 +129,7 @@ pub struct SignalData {
     signal_tree: VecTree<SignalNode>,
 
     time_span: Option<[f64; 2]>,
-    all_signals_not_empty: bool,
+    pub all_signals_have_data: bool,
 }
 
 impl SignalData {
@@ -141,7 +140,7 @@ impl SignalData {
             signals,
             signal_tree,
             time_span: None,
-            all_signals_not_empty: false,
+            all_signals_have_data: false,
         }
     }
 
@@ -165,13 +164,10 @@ impl SignalData {
             let mut max = self.time_span.map(|v| v[1]);
 
             // Update initial time only until we have considered all signals
-            if !self.all_signals_not_empty {
-                self.all_signals_not_empty = true; // Tentatively set this to true
+            if !self.all_signals_have_data {
                 if let Some(&first) = sig.time().first() {
                     if min.is_none() || first < min.unwrap() {
                         min = Some(first);
-                    } else {
-                        self.all_signals_not_empty = false;
                     }
                 }
             }
@@ -186,6 +182,12 @@ impl SignalData {
                 self.time_span = Some([min, max]);
             }
         }
+
+        self.all_signals_have_data = self
+            .signals
+            .get_signals()
+            .iter()
+            .all(|(_, s)| s.time().len() > 0);
     }
 
     fn grow_signal_tree(signals: &PlotSignals) -> VecTree<SignalNode> {
