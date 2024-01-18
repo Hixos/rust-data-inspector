@@ -10,3 +10,4 @@ clap = { version = "4.4.17", features = ["derive"] }
 rust_data_inspector_signals = { path = "../rust_data_inspector_signals" }
 rust_data_inspector = { path = ".." }
 anyhow = { version = "1.0.79", features = ["backtrace"] }
+atty = "0.2.14"

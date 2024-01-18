@@ -1,14 +1,18 @@
-use anyhow::{bail, anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use rust_data_inspector::datainspector::DataInspector;
 use rust_data_inspector_signals::{PlotSignalProducer, PlotSignalSample, PlotSignals};
 use std::{
-    fs::File,
-    io::{self, prelude::*, BufRead, BufReader, Read},
+    fs::{read, File},
+    hint,
+    io::{self, BufRead, BufReader, Seek, Stdin},
     path::Path,
     thread::spawn,
     time::Instant,
 };
+
+trait BufReadSeek: BufRead + Seek {}
+
 #[derive(Parser, Debug)]
 #[command(name = "Rust Data Inspector")]
 #[command(author = "Luca Erbetta <luca.erbetta105@gmail.com")]
@@ -16,13 +20,13 @@ use std::{
 #[command(about = "Plot everything, from everywhere, all at once", long_about = None)]
 struct Cli {
     #[arg(short, long)]
-    pipe: bool,
-
-    #[arg(short, long)]
     file: Option<String>,
 
     #[arg(long)]
     columns: Vec<String>,
+
+    #[arg(long)]
+    col_hint: Option<usize>,
 
     #[arg(short, long, default_value_t=String::from(","))]
     separator: String,
@@ -32,9 +36,6 @@ struct Cli {
 
     #[arg(short, long)]
     real_time: bool,
-
-    #[arg(short, long)]
-    count: Option<usize>,
 }
 
 fn read_lines<P>(path: P) -> io::Result<io::Lines<BufReader<File>>>
@@ -52,46 +53,19 @@ struct CSVPlotter {
     separator: String,
     time_index: Option<usize>,
     real_time: bool,
-    max_lines: Option<usize>,
 }
 
 impl CSVPlotter {
-    fn with_signals<R: BufRead + Send + 'static>(
+    fn with_signals<R: BufReadSeek + Send + 'static>(
         signals: &mut PlotSignals,
         mut reader: R,
         mut columns: Vec<String>,
         separator: String,
         time_index: Option<usize>,
         real_time: bool,
-        max_lines: Option<usize>,
+        hint_cols: Option<usize>,
     ) -> Result<Self> {
-        let mut header = String::default();
-
-        reader.read_line(&mut header)?;
-
-        let header = header.trim();
-
-        if columns.is_empty() {
-            columns = header
-                .split(&separator)
-                .map(|s| ["/", s].join(""))
-                .collect();
-        }
-
-        let senders = columns
-            .iter()
-            .map(|c| signals.add_signal(c).expect("Error adding signal").1)
-            .collect();
-
-        if let Some(time_index) = time_index {
-            if time_index >= columns.len() {
-                bail!(
-                    "Time index '{}' is out of bounds. Number of columns: {}",
-                    time_index,
-                    columns.len()
-                );
-            }
-        }
+        let (signals, senders) = Self::find_data(&mut reader, hint_cols, separator);
 
         Ok(CSVPlotter {
             buf: Box::new(reader),
@@ -100,8 +74,80 @@ impl CSVPlotter {
             separator,
             time_index,
             real_time,
-            max_lines,
         })
+    }
+
+    fn find_data<R: BufReadSeek + Send + 'static>(
+        reader: &mut R,
+        hint_cols: Option<usize>,
+        separator: String,
+    ) -> (PlotSignals, Vec<PlotSignalProducer>) {
+        enum State {
+            FindHeader,
+            CheckData,
+        }
+
+        let mut signals = PlotSignals::default();
+        let mut producers: Vec<PlotSignalProducer> = vec![];
+
+        let mut state = State::FindHeader;
+        let mut buf = String::new();
+
+        while let Ok(len) = reader.read_line(&mut buf) {
+            let mut success = false;
+            match state {
+                State::FindHeader => {
+                    let columns: Vec<String> =
+                        buf.split(&separator).map(|s| ["/", s].join("")).collect();
+
+                    if hint_cols == Some(columns.len()) || hint_cols.is_none() {
+                        state = State::CheckData;
+                        success = true;
+                        for c in columns {
+                            if let Ok((_, producer)) = signals.add_signal(&c) {
+                                producers.push(producer);
+                            } else {
+                                // Columns are not valid, continue looking for a valid header
+                                success = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                State::CheckData => {
+                    if let Ok(values) = buf
+                        .split(&separator)
+                        .map(|c| {
+                            c.parse::<f64>()
+                                .map_err(|_| anyhow!("Error parsing string: '{c}'"))
+                        })
+                        .collect::<Result<Vec<_>>>()
+                    {
+                        if values.len() == producers.len() {
+                            // Found a line of data matching the header, this is probably the start of the CSV data!
+                            success = true;
+
+                            // Seek back so we can plot the first data line
+                            reader.seek(io::SeekFrom::Current(-(len as i64))).unwrap();
+                        }
+                    }
+                }
+            }
+
+            if !success {
+                state = State::FindHeader;
+                signals = PlotSignals::default();
+                producers.clear();
+                producers.shrink_to_fit();
+
+                // Echo the line we just read
+                println!("{}", buf);
+            }
+
+            buf.clear();
+        }
+
+        (signals, producers)
     }
 
     fn plot_lines(&mut self) -> Result<()> {
@@ -132,7 +178,10 @@ impl CSVPlotter {
         if len > 0 {
             let values: Vec<f64> = line
                 .split(&self.separator)
-                .map(|c| c.parse::<f64>().map_err(|_| anyhow!("Error parsing string: '{c}'")))
+                .map(|c| {
+                    c.parse::<f64>()
+                        .map_err(|_| anyhow!("Error parsing string: '{c}'"))
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             let time = if let Some(time_index) = self.time_index {
@@ -174,13 +223,21 @@ fn set_thread_panic_hook() {
     }));
 }
 
+impl BufReadSeek for BufReader<File> {
+
+}
+
+impl BufReadSeek for BufReader<Stdin> {
+
+}
+
 fn main() -> Result<()> {
     set_thread_panic_hook();
     let cli = Cli::parse();
 
     let mut signals = PlotSignals::default();
 
-    let input: Box<dyn BufRead + Send + 'static> = if let Some(file) = cli.file {
+    let input: Box<dyn BufReadSeek + Send + 'static> = if let Some(file) = cli.file {
         Box::new(BufReader::new(File::open(file)?))
     } else {
         let stdin = io::stdin();
@@ -194,13 +251,14 @@ fn main() -> Result<()> {
         cli.separator,
         cli.time_index,
         cli.real_time,
-        cli.count,
+        cli.col_hint
     )?;
 
     spawn(move || {
-        csvplotter.plot_lines().expect("Error readiung csv file");
+        csvplotter.plot_lines().expect("Error reading csv file");
     });
 
     DataInspector::run_native("Rust Data Inspector", signals).unwrap();
+    println!("App terminated");
     Ok(())
 }
