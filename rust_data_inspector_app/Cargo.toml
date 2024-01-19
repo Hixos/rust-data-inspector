@@ -1,7 +1,11 @@
 [package]
-name = "rdi-plot"
+name = "rust_data_inspector_app"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "datainspector"
+path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,3 +14,4 @@ clap = { version = "4.4.17", features = ["derive"] }
 rust_data_inspector_signals = { path = "../rust_data_inspector_signals" }
 rust_data_inspector = { path = ".." }
 anyhow = { version = "1.0.79", features = ["backtrace"] }
+atty = "0.2.14"

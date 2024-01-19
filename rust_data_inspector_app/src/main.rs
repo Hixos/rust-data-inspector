@@ -1,14 +1,14 @@
-use anyhow::{bail, anyhow, Result};
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use rust_data_inspector::datainspector::DataInspector;
-use rust_data_inspector_signals::{PlotSignalProducer, PlotSignalSample, PlotSignals};
+use rust_data_inspector_signals::{PlotSampleSender, PlotSignalSample, PlotSignals};
 use std::{
     fs::File,
-    io::{self, prelude::*, BufRead, BufReader, Read},
-    path::Path,
+    io::{self, BufRead, BufReader},
     thread::spawn,
     time::Instant,
 };
+
 #[derive(Parser, Debug)]
 #[command(name = "Rust Data Inspector")]
 #[command(author = "Luca Erbetta <luca.erbetta105@gmail.com")]
@@ -16,13 +16,13 @@ use std::{
 #[command(about = "Plot everything, from everywhere, all at once", long_about = None)]
 struct Cli {
     #[arg(short, long)]
-    pipe: bool,
-
-    #[arg(short, long)]
     file: Option<String>,
 
     #[arg(long)]
     columns: Vec<String>,
+
+    #[arg(long)]
+    col_hint: Option<usize>,
 
     #[arg(short, long, default_value_t=String::from(","))]
     separator: String,
@@ -32,133 +32,218 @@ struct Cli {
 
     #[arg(short, long)]
     real_time: bool,
-
-    #[arg(short, long)]
-    count: Option<usize>,
-}
-
-fn read_lines<P>(path: P) -> io::Result<io::Lines<BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let reader = BufReader::new(File::open(path)?);
-    Ok(reader.lines())
 }
 
 struct CSVPlotter {
-    buf: Box<dyn BufRead + Send>,
-    columns: Vec<String>,
-    senders: Vec<PlotSignalProducer>,
-    separator: String,
-    time_index: Option<usize>,
-    real_time: bool,
-    max_lines: Option<usize>,
+    reader: Box<dyn BufRead + Send>,
+    line_sender: LineSender,
 }
 
 impl CSVPlotter {
     fn with_signals<R: BufRead + Send + 'static>(
-        signals: &mut PlotSignals,
         mut reader: R,
         mut columns: Vec<String>,
         separator: String,
-        time_index: Option<usize>,
+        time_col_index: Option<usize>,
         real_time: bool,
-        max_lines: Option<usize>,
-    ) -> Result<Self> {
-        let mut header = String::default();
+        hint_cols: Option<usize>,
+    ) -> (Self, PlotSignals) {
+        println!("- Waiting for valid data...");
 
-        reader.read_line(&mut header)?;
+        let (signals, senders, first_data) =
+            Self::find_data(&mut reader, hint_cols, separator.clone());
 
-        let header = header.trim();
+        let mut line_sender = if let Some(time_col_index) = time_col_index {
+            LineSender::new(TimeIndex::Column(time_col_index, None), senders, separator)
+        } else if real_time {
+            LineSender::new(TimeIndex::Generated(Instant::now()), senders, separator)
+        } else {
+            LineSender::new(TimeIndex::Counter(0), senders, separator)
+        };
 
-        if columns.is_empty() {
-            columns = header
-                .split(&separator)
-                .map(|s| ["/", s].join(""))
-                .collect();
-        }
+        let _ = line_sender.send_line(&first_data);
 
-        let senders = columns
-            .iter()
-            .map(|c| signals.add_signal(c).expect("Error adding signal").1)
-            .collect();
+        (
+            CSVPlotter {
+                reader: Box::new(reader),
+                line_sender,
+            },
+            signals,
+        )
+    }
 
-        if let Some(time_index) = time_index {
-            if time_index >= columns.len() {
-                bail!(
-                    "Time index '{}' is out of bounds. Number of columns: {}",
-                    time_index,
-                    columns.len()
-                );
+    fn plot_lines(&mut self) {
+        let mut buf = String::new();
+        let mut index = 2; // Starts from 2 since we read the first line in find_data
+        while let Ok(len) = self.reader.read_line(&mut buf) {
+            if len == 0 {
+                break;
             }
+            if let Err(e) = self.line_sender.send_line(buf.as_str()) {
+                println!("Error reading line {}: {}", index, e);
+            }
+            index += 1;
+            buf.clear();
+        }
+    }
+
+    fn find_data<R: BufRead + Send + 'static>(
+        reader: &mut R,
+        hint_cols: Option<usize>,
+        separator: String,
+    ) -> (PlotSignals, Vec<PlotSampleSender>, String) {
+        enum State {
+            FindHeader,
+            CheckData,
         }
 
-        Ok(CSVPlotter {
-            buf: Box::new(reader),
-            columns,
-            senders,
-            separator,
+        let mut signals = PlotSignals::default();
+        let mut producers: Vec<PlotSampleSender> = vec![];
+
+        let mut state = State::FindHeader;
+        let mut buf = String::new();
+
+        let mut first_data: Option<String> = None;
+
+        'line_loop: while let Ok(len) = reader.read_line(&mut buf) {
+            if len == 0 {
+                break 'line_loop;
+            }
+            let line = buf.trim();
+
+            let mut success = false;
+            match state {
+                State::FindHeader => {
+                    let columns: Vec<String> =
+                        line.split(&separator).map(|s| ["/", s].join("")).collect();
+
+                    if hint_cols == Some(columns.len()) || hint_cols.is_none() {
+                        state = State::CheckData;
+                        success = true;
+                        for c in columns {
+                            if let Ok((_, producer)) = signals.add_signal(&c) {
+                                producers.push(producer);
+                            } else {
+                                // Columns are not valid, continue looking for a valid header
+                                success = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                State::CheckData => {
+                    if let Ok(values) = line
+                        .split(&separator)
+                        .map(|c| {
+                            c.parse::<f64>()
+                                .map_err(|_| anyhow!("Error parsing string: '{c}'"))
+                        })
+                        .collect::<Result<Vec<_>>>()
+                    {
+                        if values.len() == producers.len() {
+                            // Found a line of data matching the header, this is probably the start of the CSV data!
+                            // Send this first data line
+                            first_data = Some(buf.clone());
+
+                            break 'line_loop;
+                        } else {
+                            success = false;
+                        }
+                    }
+                }
+            }
+
+            if !success {
+                state = State::FindHeader;
+                signals = PlotSignals::default();
+                producers.clear();
+                producers.shrink_to_fit();
+
+                // Echo the line we just read
+                println!("{}", line);
+            }
+
+            buf.clear();
+        }
+
+        (signals, producers, first_data.unwrap())
+    }
+}
+
+enum TimeIndex {
+    Column(usize, Option<f64>),
+    Counter(usize),
+    Generated(Instant),
+}
+
+struct LineSender {
+    time_index: TimeIndex,
+    senders: Vec<PlotSampleSender>,
+    sep: String,
+}
+
+impl LineSender {
+    fn new(time_index: TimeIndex, senders: Vec<PlotSampleSender>, sep: String) -> Self {
+        Self {
             time_index,
-            real_time,
-            max_lines,
-        })
-    }
-
-    fn plot_lines(&mut self) -> Result<()> {
-        let mut step = 0usize;
-        let start_time = Instant::now();
-
-        let mut line = String::new();
-
-        let mut last_time: f64 = 0.0;
-        loop {
-            step += 1;
-            line.clear();
-            self.plot_line(&mut line, start_time, step, &mut last_time)?;
+            senders,
+            sep,
         }
     }
 
-    fn plot_line(
-        &mut self,
-        line: &mut String,
-        start_time: Instant,
-        step: usize,
-        last_time: &mut f64,
-    ) -> Result<usize> {
-        let len = self.buf.read_line(line)?;
-
+    fn send_line(&mut self, line: &str) -> Result<()> {
         let line = line.trim();
+        let data = line
+            .split(&self.sep)
+            .map(|v| v.parse::<f64>().map_err(anyhow::Error::from))
+            .collect::<Result<Vec<f64>>>()?;
 
-        if len > 0 {
-            let values: Vec<f64> = line
-                .split(&self.separator)
-                .map(|c| c.parse::<f64>().map_err(|_| anyhow!("Error parsing string: '{c}'")))
-                .collect::<Result<Vec<_>>>()?;
+        match &mut self.time_index {
+            TimeIndex::Column(index, last_time) => {
+                if *index < data.len() {
+                    let time = *data.get(*index).unwrap();
+                    if let Some(last_time) = last_time {
+                        if time <= *last_time {
+                            return Err(anyhow!("Provided time is not strictly monotonic"));
+                        }
+                    }
+                    *last_time = Some(time);
 
-            let time = if let Some(time_index) = self.time_index {
-                *values.get(time_index).unwrap()
-            } else if self.real_time {
-                (Instant::now() - start_time).as_secs_f64()
-            } else {
-                step as f64
-            };
-
-            if time <= *last_time {
-                // Skipt this line
-                return Ok(len);
+                    data.into_iter()
+                        .zip(self.senders.iter_mut())
+                        .enumerate()
+                        .filter(|(i, _)| *i != *index)
+                        .for_each(|(_, (value, sender))| {
+                            let _ = sender.send(PlotSignalSample { time, value });
+                        });
+                    Ok(())
+                } else {
+                    Err(anyhow!("Time column index is outside of bounds!"))
+                }
             }
+            TimeIndex::Generated(start_time) => {
+                let time = (Instant::now() - *start_time).as_secs_f64();
+                data.into_iter()
+                    .zip(self.senders.iter_mut())
+                    .enumerate()
+                    .for_each(|(_, (value, sender))| {
+                        let _ = sender.send(PlotSignalSample { time, value });
+                    });
+                Ok(())
+            }
+            TimeIndex::Counter(count) => {
+                let time = *count as f64;
+                data.into_iter()
+                    .zip(self.senders.iter_mut())
+                    .enumerate()
+                    .for_each(|(_, (value, sender))| {
+                        let _ = sender.send(PlotSignalSample { time, value });
+                    });
 
-            *last_time = time;
-
-            values.into_iter().enumerate().for_each(|(i, value)| {
-                self.senders
-                    .get_mut(i)
-                    .unwrap()
-                    .send(PlotSignalSample { time, value })
-                    .unwrap();
-            });
+                *count += 1;
+                Ok(())
+            }
         }
-        Ok(len)
     }
 }
 
@@ -178,8 +263,6 @@ fn main() -> Result<()> {
     set_thread_panic_hook();
     let cli = Cli::parse();
 
-    let mut signals = PlotSignals::default();
-
     let input: Box<dyn BufRead + Send + 'static> = if let Some(file) = cli.file {
         Box::new(BufReader::new(File::open(file)?))
     } else {
@@ -187,20 +270,20 @@ fn main() -> Result<()> {
         Box::new(BufReader::new(stdin))
     };
 
-    let mut csvplotter = CSVPlotter::with_signals(
-        &mut signals,
+    let (mut csvplotter, signals) = CSVPlotter::with_signals(
         input,
         cli.columns,
         cli.separator,
         cli.time_index,
         cli.real_time,
-        cli.count,
-    )?;
+        cli.col_hint,
+    );
 
     spawn(move || {
-        csvplotter.plot_lines().expect("Error readiung csv file");
+        csvplotter.plot_lines();
     });
 
     DataInspector::run_native("Rust Data Inspector", signals).unwrap();
+    println!("App terminated");
     Ok(())
 }
