@@ -90,7 +90,7 @@ impl PlotSignals {
     /// - `drone/sensors/press1` Error: Does not start with `/`  
     /// - `/drone/sensors/temp-bat` Error: illegal character `-`  
     /// - `/drone/sensors//current` Error: consecutive `/`  
-    pub fn add_signal(&mut self, name: &str) -> Result<(PlotSignalID, PlotSignalProducer), PlotSignalError> {
+    pub fn add_signal(&mut self, name: &str) -> Result<(PlotSignalID, PlotSampleSender), PlotSignalError> {
         self.validate_name(name)?;
 
         let id = PlotSignalID {
@@ -106,7 +106,7 @@ impl PlotSignals {
         self.signals.insert(id, PlotSignal::new(name.to_string(), id));
         self.receivers.insert(id, receiver);
 
-        Ok((id, PlotSignalProducer { sender, id }))
+        Ok((id, PlotSampleSender { sender, id }))
     }
 
     pub fn update(&mut self) {
@@ -192,12 +192,12 @@ impl<T> From<SendError<T>> for PlotSignalSendError<T> {
 }
 
 #[derive(Clone, Debug)]
-pub struct PlotSignalProducer {
+pub struct PlotSampleSender {
     sender: Sender<PlotSignalSample>,
     id: PlotSignalID,
 }
 
-impl PlotSignalProducer {
+impl PlotSampleSender {
     pub fn send(&mut self, sample: PlotSignalSample) -> Result<(), PlotSignalSendError<PlotSignalSample>> {
         self.sender.send(sample).map_err(|e| e.into())
     }
