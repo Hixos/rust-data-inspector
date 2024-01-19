@@ -42,7 +42,7 @@ struct CSVPlotter {
 impl CSVPlotter {
     fn with_signals<R: BufRead + Send + 'static>(
         mut reader: R,
-        mut columns: Vec<String>,
+        mut _columns: Vec<String>,
         separator: String,
         time_col_index: Option<usize>,
         real_time: bool,

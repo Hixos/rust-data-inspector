@@ -187,7 +187,7 @@ impl SignalData {
             .signals
             .get_signals()
             .iter()
-            .all(|(_, s)| s.time().len() > 0);
+            .all(|(_, s)| !s.time().is_empty());
     }
 
     fn grow_signal_tree(signals: &PlotSignals) -> VecTree<SignalNode> {
