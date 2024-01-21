@@ -5,6 +5,7 @@ use egui::Color32;
 use egui_dock::DockState;
 use rust_data_inspector_signals::{PlotSignalID, PlotSignals};
 use serde::{Deserialize, Serialize};
+use crate::utils::downsampling::DownsamplingMethod;
 
 use crate::{
     layout::tabs::Tab,
@@ -15,6 +16,7 @@ use crate::{
 pub struct DataInspectorState {
     pub x_axis_mode: XAxisMode,
     pub link_x: bool,
+    pub downsample_mode: DownsamplingMethod,
 
     pub selected_pane: u64,
     pub signal_state: HashMap<PlotSignalID, SignalState>,
@@ -30,6 +32,7 @@ impl DataInspectorState {
         DataInspectorState {
             x_axis_mode: XAxisMode::default(),
             link_x: true,
+            downsample_mode: DownsamplingMethod::Lttb,
             selected_pane: 1,
             signal_state: signals
                 .get_signals()
@@ -109,7 +112,7 @@ pub struct SignalState {
     pub used_by_tile: BTreeSet<u64>,
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub enum XAxisMode {
     #[default]
     Fit,

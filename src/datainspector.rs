@@ -2,6 +2,7 @@ use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
 use crate::layout::tabs::{Tab, TabViewer};
 use crate::state::{DataInspectorState, SignalData, TabState, XAxisMode};
+use crate::utils::downsampling::DownsamplingMethod;
 use eframe::NativeOptions;
 use egui_dock::{DockArea, Style};
 use rust_data_inspector_signals::PlotSignals;
@@ -17,7 +18,7 @@ pub struct DataInspector {
 }
 
 impl DataInspector {
-    pub fn run_native(app_name: &str, signals: PlotSignals) -> Result<(), eframe::Error>{
+    pub fn run_native(app_name: &str, signals: PlotSignals) -> Result<(), eframe::Error> {
         eframe::run_native(
             app_name,
             NativeOptions::default(),
@@ -100,6 +101,20 @@ impl eframe::App for DataInspector {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
+                    ui.menu_button("Options", |ui| {
+                        ui.menu_button("Downsampling Mode", |ui| {
+                            ui.selectable_value(
+                                &mut self.state.downsample_mode,
+                                DownsamplingMethod::Lttb,
+                                "LTTB",
+                            );
+                            ui.selectable_value(
+                                &mut self.state.downsample_mode,
+                                DownsamplingMethod::Decimation,
+                                "Decimation",
+                            );
+                        });
+                    });
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.selectable_value(&mut self.state.x_axis_mode, XAxisMode::Follow, "Follow");
@@ -119,7 +134,10 @@ impl eframe::App for DataInspector {
                 self.frame_history.ui(ui);
                 ui.label(format!("FPS: {}", self.frame_history.fps()));
 
-                ui.label(format!("All signals active: {}", self.signals.all_signals_have_data));
+                ui.label(format!(
+                    "All signals active: {}",
+                    self.signals.all_signals_have_data
+                ));
                 ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
             });
         });

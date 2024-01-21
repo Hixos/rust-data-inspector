@@ -7,7 +7,10 @@ use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
 use rust_data_inspector_signals::{PlotSignal, PlotSignalID};
 use serde::{Deserialize, Serialize};
 
-use crate::state::{DataInspectorState, SignalData, XAxisMode};
+use crate::{
+    state::{DataInspectorState, SignalData, XAxisMode},
+    utils::downsampling::{decimate, DownsamplingMethod},
+};
 
 const DEFAULT_PLOT_WIDTH: f64 = 30.0;
 const PLOT_MARGIN_PC: f64 = 0.01;
@@ -91,21 +94,12 @@ impl Tab {
                                 );
                                 let time = signal.time().get(range.clone()).unwrap();
                                 let data = signal.data().get(range.clone()).unwrap();
-                                let points = if time.len() > (plot_rect_width as f32 * 2.5) as usize
-                                {
-                                    let downsampled_indices =
-                                        lttb_with_x(time, data, plot_rect_width * 2);
-
-                                    downsampled_indices
-                                        .into_iter()
-                                        .map(|i| [time[i], data[i]])
-                                        .collect::<PlotPoints>()
-                                } else {
-                                    time.iter()
-                                        .zip(data.iter())
-                                        .map(|(&t, &v)| [t, v])
-                                        .collect::<PlotPoints>()
-                                };
+                                let points = Self::downsample(
+                                    time,
+                                    data,
+                                    plot_rect_width,
+                                    state.downsample_mode,
+                                );
 
                                 plot_ui.line(
                                     Line::new(points).color(sig_state.color).name(signal.name()),
@@ -193,6 +187,23 @@ impl Tab {
                     }
                 }
             });
+    }
+
+    fn downsample(
+        time: &[f64],
+        data: &[f64],
+        rec_width: usize,
+        mode: DownsamplingMethod,
+    ) -> PlotPoints {
+        let indices = match mode {
+            DownsamplingMethod::Decimation => decimate(time, rec_width * 2),
+            DownsamplingMethod::Lttb => lttb_with_x(time, data, rec_width * 2),
+        };
+
+        indices
+            .into_iter()
+            .map(|i| [time[i], data[i]])
+            .collect::<PlotPoints>()
     }
 
     fn find_visible_range(
