@@ -1,11 +1,13 @@
 #![allow(dead_code)] 
 
-pub mod datainspector;
+mod datainspector;
+mod errors;
 
 pub(crate) mod framehistory;
 pub(crate) mod layout;
 pub(crate) mod utils;
 pub(crate) mod state;
-pub mod errors;
 
 pub use rust_data_inspector_signals::*;
+
+pub use datainspector::DataInspector;

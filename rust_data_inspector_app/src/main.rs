@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use rust_data_inspector::datainspector::DataInspector;
+use rust_data_inspector::DataInspector;
 use rust_data_inspector_signals::{PlotSampleSender, PlotSignalSample, PlotSignals};
 use std::{
     fs::File,

@@ -10,7 +10,7 @@ use rust_data_inspector_signals::{PlotSignals,  PlotSignalSample};
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use rust_data_inspector::datainspector::DataInspector;
+    use rust_data_inspector::DataInspector;
 
     let mut signals = PlotSignals::default();
 
