@@ -1,5 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{channel, Receiver, SendError, Sender};
 
@@ -55,6 +56,12 @@ pub struct PlotSignalID {
 pub struct PlotSignalSample {
     pub time: f64,
     pub value: f64,
+}
+
+impl Display for PlotSignalSample {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}, {}", self.time, self.value)
+    }
 }
 
 #[derive(Default)]
