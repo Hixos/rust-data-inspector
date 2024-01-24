@@ -188,6 +188,7 @@ pub enum PlotSignalError {
 }
 
 #[derive(Debug, Error)]
+#[error("Error sending plot signal sample '{t}'")]
 pub struct PlotSignalSendError<T> {
     pub t: T,
 }
