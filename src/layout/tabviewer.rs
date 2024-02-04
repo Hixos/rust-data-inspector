@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::state::{DataInspectorState, SignalData};
 
-use super::tabs::timeseries::TimeSeriesTab;
+use super::tabs::{timeseries::TimeSeriesTab, xyplot::XYPlotTab};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BaseTab {
@@ -27,6 +27,9 @@ impl BaseTab {
             Tab::TimeSeries(ts) => {
                 ts.ui(ui, state, signals, link_x_translated);
             }
+            Tab::XYPlot(xy) => {
+                xy.ui(ui, state, signals);
+            }
         }
     }
 }
@@ -34,11 +37,16 @@ impl BaseTab {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Tab {
     TimeSeries(TimeSeriesTab),
+    XYPlot(XYPlotTab),
 }
 
 impl Tab {
     pub fn timeseries(tab_id: u64) -> Self {
         Tab::TimeSeries(TimeSeriesTab::new(tab_id))
+    }
+
+    pub fn xyplot(tab_id: u64) -> Self {
+        Tab::XYPlot(XYPlotTab::new(tab_id))
     }
 }
 
@@ -84,6 +92,11 @@ impl<'a> egui_dock::TabViewer for TabViewer<'a> {
         if ui.button("Timeseries").clicked() {
             self.added_nodes
                 .push((surface, node, Box::new(Tab::timeseries)));
+        }
+
+        if ui.button("XY Plot").clicked() {
+            self.added_nodes
+                .push((surface, node, Box::new(Tab::xyplot)));
         }
     }
 }
