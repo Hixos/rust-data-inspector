@@ -1,14 +1,15 @@
 use std::collections::{BTreeSet, HashMap};
 
+use crate::layout::tabviewer::BaseTab;
+use crate::utils::downsampling::DownsamplingMethod;
 use eframe::Storage;
 use egui::Color32;
 use egui_dock::DockState;
 use rust_data_inspector_signals::{PlotSignalID, PlotSignals};
 use serde::{Deserialize, Serialize};
-use crate::utils::downsampling::DownsamplingMethod;
 
 use crate::{
-    layout::tabs::Tab,
+    layout::tabviewer::Tab,
     utils::{auto_color, VecTree},
 };
 
@@ -89,13 +90,13 @@ impl DataInspectorState {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TabState {
-    pub tree: DockState<Tab>,
+    pub tree: DockState<BaseTab>,
     pub tab_counter: u64,
 }
 
 impl Default for TabState {
     fn default() -> Self {
-        let tree = DockState::new(vec![Tab::new(1)]);
+        let tree = DockState::new(vec![BaseTab::new(1, Tab::timeseries(1))]);
         TabState {
             tree,
             tab_counter: 2,

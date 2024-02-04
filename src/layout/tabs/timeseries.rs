@@ -2,7 +2,6 @@ use std::{collections::HashMap, ops::Range};
 
 use downsample_rs::lttb_with_x;
 use egui::{Event, Vec2, Vec2b};
-use egui_dock::{NodeIndex, SurfaceIndex};
 use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
 use rust_data_inspector_signals::{PlotSignal, PlotSignalID};
 use serde::{Deserialize, Serialize};
@@ -15,10 +14,10 @@ use crate::{
 const DEFAULT_PLOT_WIDTH: f64 = 30.0;
 const PLOT_MARGIN_PC: f64 = 0.01;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Tab {
-    pub pane_id: u64,
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct TimeSeriesTab {
+    tab_id: u64,
     #[serde(skip)]
     cache: HashMap<PlotSignalID, SignalPlotCache>,
 }
@@ -28,15 +27,15 @@ struct SignalPlotCache {
     last_visible_range: Range<usize>,
 }
 
-impl Tab {
+impl TimeSeriesTab {
     pub fn new(tab_id: u64) -> Self {
-        Tab {
-            pane_id: tab_id,
+        TimeSeriesTab {
+            tab_id,
             cache: HashMap::new(),
         }
     }
 
-    fn ui(
+    pub fn ui(
         &mut self,
         ui: &mut egui::Ui,
         state: &mut DataInspectorState,
@@ -55,7 +54,7 @@ impl Tab {
             (scroll, i.pointer.primary_down(), i.modifiers)
         });
 
-        egui_plot::Plot::new(format!("plot_{}", self.pane_id))
+        egui_plot::Plot::new(format!("plot_{}", self.tab_id))
             .allow_drag(false)
             .allow_zoom(false)
             .allow_scroll(false)
@@ -78,7 +77,7 @@ impl Tab {
 
                 for (id, signal) in signals.signals().get_signals() {
                     if let Some(sig_state) = state.signal_state.get(id) {
-                        if sig_state.used_by_tile.contains(&self.pane_id) {
+                        if sig_state.used_by_tile.contains(&self.tab_id) {
                             let range = Self::find_visible_range(
                                 signal,
                                 &plot_ui.plot_bounds(),
@@ -270,41 +269,5 @@ impl Tab {
         }
 
         Some(range_i.start..range_i.end)
-    }
-}
-
-pub struct TabViewer<'a> {
-    state: &'a mut DataInspectorState,
-    signals: &'a mut SignalData,
-
-    link_x_translated: bool,
-
-    pub added_nodes: Vec<(SurfaceIndex, NodeIndex)>,
-}
-
-impl<'a> TabViewer<'a> {
-    pub fn new(state: &'a mut DataInspectorState, signals: &'a mut SignalData) -> Self {
-        TabViewer {
-            state,
-            signals,
-            link_x_translated: false,
-            added_nodes: vec![],
-        }
-    }
-}
-
-impl<'a> egui_dock::TabViewer for TabViewer<'a> {
-    type Tab = Tab;
-
-    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        format!("Tab {}", tab.pane_id).into()
-    }
-
-    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        tab.ui(ui, self.state, self.signals, &mut self.link_x_translated);
-    }
-
-    fn on_add(&mut self, surface: egui_dock::SurfaceIndex, node: egui_dock::NodeIndex) {
-        self.added_nodes.push((surface, node));
     }
 }

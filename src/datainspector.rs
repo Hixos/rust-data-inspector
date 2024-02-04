@@ -1,6 +1,6 @@
 use crate::framehistory::FrameHistory;
 use crate::layout::signallist::SignalListUI;
-use crate::layout::tabs::{Tab, TabViewer};
+use crate::layout::tabviewer::{BaseTab, Tab, TabViewer};
 use crate::state::{DataInspectorState, SignalData, TabState, XAxisMode};
 use crate::utils::downsampling::DownsamplingMethod;
 use eframe::NativeOptions;
@@ -85,7 +85,7 @@ impl eframe::App for DataInspector {
 
         // Find last interfacted pane
         if let Some((_, tab)) = self.tab_state.tree.find_active_focused() {
-            self.state.selected_pane = tab.pane_id;
+            self.state.selected_pane = tab.tab_id;
         }
 
         ctx.request_repaint();
@@ -149,17 +149,21 @@ impl eframe::App for DataInspector {
                 let show_close_button = self.tab_state.tree.iter_all_tabs().count() > 1;
                 DockArea::new(&mut self.tab_state.tree)
                     .show_add_buttons(true)
+                    .show_add_popup(true)
                     .show_close_buttons(show_close_button)
                     .style(Style::from_egui(ctx.style().as_ref()))
                     .show_inside(ui, &mut tabviewer);
 
-                for (surface, node) in tabviewer.added_nodes.drain(..) {
+                for (surface, node, add_fn) in tabviewer.added_nodes.drain(..) {
                     self.tab_state
                         .tree
                         .set_focused_node_and_surface((surface, node));
+
+                    let tab = add_fn(self.tab_state.tab_counter);
+
                     self.tab_state
                         .tree
-                        .push_to_focused_leaf(Tab::new(self.tab_state.tab_counter));
+                        .push_to_focused_leaf(BaseTab::new(self.tab_state.tab_counter, tab));
                     self.tab_state.tab_counter += 1;
                 }
             });
