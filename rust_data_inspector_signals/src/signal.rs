@@ -206,7 +206,7 @@ pub struct PlotSampleSender {
 }
 
 impl PlotSampleSender {
-    pub fn send(&mut self, sample: PlotSignalSample) -> Result<(), PlotSignalSendError<PlotSignalSample>> {
+    pub fn send(&self, sample: PlotSignalSample) -> Result<(), PlotSignalSendError<PlotSignalSample>> {
         self.sender.send(sample).map_err(|e| e.into())
     }
 
