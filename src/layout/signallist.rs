@@ -13,7 +13,9 @@ impl SignalListUI {
     }
 
     pub fn ui(&self, ui: &mut egui::Ui, signals: &SignalData, state: &mut DataInspectorState) {
-        Self::ui_impl(ui, signals.signal_tree(), state, true);
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            Self::ui_impl(ui, signals.signal_tree(), state, true)
+        });
     }
 
     fn ui_impl(
