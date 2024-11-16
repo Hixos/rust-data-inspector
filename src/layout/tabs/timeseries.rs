@@ -1,19 +1,21 @@
-use std::{collections::HashMap, ops::Range};
+use std::{
+    collections::HashMap,
+    ops::{Range, RangeInclusive},
+};
 
 use downsample_rs::lttb_with_x;
 use egui::{Event, Vec2, Vec2b};
 use egui_plot::{Legend, Line, PlotBounds, PlotPoints};
-use rust_data_inspector_signals::{PlotSignal, PlotSignalID};
+use rust_data_inspector_signals::PlotSignalID;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     state::{DataInspectorState, SignalData, XAxisMode},
-    utils::downsampling::{decimate, DownsamplingMethod},
+    utils::downsampling::{decimate, find_visible_index_range, DownsamplingMethod},
 };
 
 const DEFAULT_PLOT_WIDTH: f64 = 30.0;
 const PLOT_MARGIN_PC: f64 = 0.01;
-
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TimeSeriesTab {
@@ -24,7 +26,7 @@ pub struct TimeSeriesTab {
 
 #[derive(Debug, Default, Clone)]
 struct SignalPlotCache {
-    last_visible_range: Range<usize>,
+    last_index_range: Range<usize>,
 }
 
 impl TimeSeriesTab {
@@ -54,7 +56,7 @@ impl TimeSeriesTab {
             (scroll, i.pointer.primary_down(), i.modifiers)
         });
 
-        egui_plot::Plot::new(format!("plot_{}", self.tab_id))
+        let plot_response = egui_plot::Plot::new(format!("plot_{}", self.tab_id))
             .allow_drag(false)
             .allow_zoom(false)
             .allow_scroll(false)
@@ -75,20 +77,25 @@ impl TimeSeriesTab {
                         .screen_from_plot(plot_ui.plot_bounds().min().into())
                         .x as usize;
 
+                let x_bounds = RangeInclusive::new(
+                    plot_ui.plot_bounds().min()[0],
+                    plot_ui.plot_bounds().max()[0],
+                );
+
                 for (id, signal) in signals.signals().get_signals() {
                     if let Some(sig_state) = state.signal_state.get(id) {
                         if sig_state.used_by_tile.contains(&self.tab_id) {
-                            let range = Self::find_visible_range(
+                            let range = find_visible_index_range(
                                 signal,
-                                &plot_ui.plot_bounds(),
-                                self.cache.get(id),
+                                &x_bounds,
+                                self.cache.get(id).map(|c| c.last_index_range.clone()),
                             );
 
                             if let Some(range) = range {
                                 self.cache.insert(
                                     *id,
                                     SignalPlotCache {
-                                        last_visible_range: range.clone(),
+                                        last_index_range: range.clone(),
                                     },
                                 );
                                 let time = signal.time().get(range.clone()).unwrap();
@@ -123,7 +130,6 @@ impl TimeSeriesTab {
                                 x: dx as f32,
                                 y: 0.0,
                             });
-                            *link_x_translated = true;
                         }
                     }
 
@@ -146,7 +152,7 @@ impl TimeSeriesTab {
                     }
 
                     XAxisMode::Free => {}
-                }
+                };
 
                 // User interaction transformations
                 if plot_ui.response().hovered() {
@@ -186,6 +192,19 @@ impl TimeSeriesTab {
                     }
                 }
             });
+
+        let bounds = plot_response.transform.bounds();
+        let visible_range = RangeInclusive::new(bounds.min()[0], bounds.max()[0]);
+        if state.link_x {
+            if !*link_x_translated {
+                state.visible_range = visible_range;
+            }
+        } else if plot_response.response.hovered() {
+            println!("Changed");
+            state.visible_range = visible_range;
+        }
+
+        *link_x_translated = true;
     }
 
     fn downsample(
@@ -203,71 +222,5 @@ impl TimeSeriesTab {
             .into_iter()
             .map(|i| [time[i], data[i]])
             .collect::<PlotPoints>()
-    }
-
-    fn find_visible_range(
-        signal: &PlotSignal,
-        plot_bounds: &PlotBounds,
-        cache: Option<&SignalPlotCache>,
-    ) -> Option<Range<usize>> {
-        if signal.time().is_empty() {
-            return None;
-        }
-
-        let mut range_i = cache.map(|v| v.last_visible_range.clone()).unwrap_or(0..1);
-
-        let left_t = *signal.time().get(range_i.start).unwrap();
-        let right_t = *signal.time().get(range_i.end - 1).unwrap();
-
-        let left_bound = plot_bounds.min()[0];
-        let right_bound = plot_bounds.max()[0];
-
-        if left_t < left_bound {
-            for (i, &t) in signal.time().iter().enumerate().skip(range_i.start) {
-                if t < left_bound {
-                    range_i.start = i;
-                } else {
-                    break;
-                }
-            }
-        } else {
-            for (i, &t) in signal
-                .time()
-                .iter()
-                .enumerate()
-                .rev()
-                .skip(signal.time().len() - range_i.start)
-            {
-                range_i.start = i;
-                if t < left_bound {
-                    break;
-                }
-            }
-        }
-
-        if right_t < right_bound {
-            for (i, &t) in signal.time().iter().enumerate().skip(range_i.end) {
-                range_i.end = i + 1;
-                if t > right_bound {
-                    break;
-                }
-            }
-        } else {
-            for (i, &t) in signal
-                .time()
-                .iter()
-                .enumerate()
-                .rev()
-                .skip(signal.time().len() - range_i.end)
-            {
-                if t > right_bound {
-                    range_i.end = i + 1;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        Some(range_i.start..range_i.end)
     }
 }

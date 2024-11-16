@@ -1,4 +1,7 @@
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    ops::RangeInclusive,
+};
 
 use crate::layout::tabviewer::BaseTab;
 use crate::utils::downsampling::DownsamplingMethod;
@@ -15,13 +18,22 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataInspectorState {
+    // Plots
+    pub visible_range: RangeInclusive<f64>,
+
+    // Timeseries
+    pub downsample_mode: DownsamplingMethod,
     pub x_axis_mode: XAxisMode,
     pub link_x: bool,
-    pub downsample_mode: DownsamplingMethod,
 
+    // XY
+    pub xy_num_samples: usize,
+
+    // Dock
     pub selected_pane: u64,
-    pub signal_state: HashMap<PlotSignalID, SignalState>,
 
+    // Signals
+    pub signal_state: HashMap<PlotSignalID, SignalState>,
     pub signal_color_counter: usize,
 
     #[serde(skip)]
@@ -31,6 +43,8 @@ pub struct DataInspectorState {
 impl DataInspectorState {
     pub fn new(signals: &PlotSignals) -> Self {
         DataInspectorState {
+            visible_range: RangeInclusive::new(0.0, 0.0),
+            xy_num_samples: 1000,
             x_axis_mode: XAxisMode::default(),
             link_x: true,
             downsample_mode: DownsamplingMethod::Lttb,

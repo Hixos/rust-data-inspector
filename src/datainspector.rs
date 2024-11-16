@@ -135,8 +135,8 @@ impl eframe::App for DataInspector {
                 ui.label(format!("FPS: {}", self.frame_history.fps()));
 
                 ui.label(format!(
-                    "All signals active: {}",
-                    self.signals.all_signals_have_data
+                    "Range: {:?}",
+                    self.state.visible_range
                 ));
                 ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
             });
