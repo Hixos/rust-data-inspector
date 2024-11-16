@@ -15,20 +15,49 @@ pub struct DataInspector {
     tab_state: TabState,
     frame_history: FrameHistory,
     reset: bool,
+    clear_timeseries: bool,
+    custom_buttons: Option<Box<dyn FnMut(&mut egui::Ui, &mut DataInspectorAPI)>>,
+}
+
+#[derive(Debug, Default)]
+pub struct DataInspectorAPI {
+    clear_timeseries: bool,
+}
+
+impl<'a> DataInspectorAPI {
+    pub fn clear_timeseries(&mut self) {
+        self.clear_timeseries = true;
+    }
 }
 
 impl DataInspector {
-    pub fn run_native(app_name: &str, signals: PlotSignals) -> Result<(), eframe::Error> {
+    pub fn run_native(
+        app_name: &str,
+        signals: PlotSignals,
+        custom_buttons: Option<impl FnMut(&mut egui::Ui, &mut DataInspectorAPI) + 'static>,
+    ) -> Result<(), eframe::Error> {
         eframe::run_native(
             app_name,
             NativeOptions::default(),
-            Box::new(|cc| Box::new(DataInspector::run(cc, signals))),
+            Box::new(|cc| {
+                Box::new(DataInspector::run(
+                    cc,
+                    signals,
+                    custom_buttons.map(|f| -> Box<dyn FnMut(&mut egui::Ui, &mut DataInspectorAPI)> {
+                        Box::new(f)
+                    }),
+                ))
+            }),
         )
     }
 
     /// Called once before the first frame.
     #[allow(unused)]
-    pub fn run(cc: &eframe::CreationContext<'_>, signals: PlotSignals) -> Self {
+    pub fn run(
+        cc: &eframe::CreationContext<'_>,
+        signals: PlotSignals,
+        custom_buttons: Option<Box<dyn FnMut(&mut egui::Ui, &mut DataInspectorAPI)>>,
+    ) -> Self {
         // Load from storage, if available
         let (state, tab_state) = if let Some(storage) = cc.storage {
             let state = DataInspectorState::from_storage(storage, &signals);
@@ -55,6 +84,8 @@ impl DataInspector {
             frame_history: FrameHistory::default(),
             tab_state,
             reset: false,
+            clear_timeseries: false,
+            custom_buttons,
         }
     }
 
@@ -78,6 +109,16 @@ impl eframe::App for DataInspector {
             }
         }
 
+        if self.clear_timeseries {
+            self.signals.signals_mut().clear_timeseries();
+
+            for (_, tab) in self.tab_state.tree.iter_all_tabs_mut() {
+                tab.clear_cache();
+            }
+
+            self.clear_timeseries = false;
+        }
+
         self.signals.update();
 
         self.frame_history
@@ -94,6 +135,9 @@ impl eframe::App for DataInspector {
             ui.horizontal(|ui| {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
+                        if ui.button("Clear data").clicked() {
+                            self.clear_timeseries = true;
+                        }
                         if ui.button("Reset").clicked() {
                             self.reset = true;
                         }
@@ -124,6 +168,13 @@ impl eframe::App for DataInspector {
                     ui.label("Plot mode:");
 
                     ui.toggle_value(&mut self.state.link_x, "Link X");
+
+                    if let Some(f) = &mut self.custom_buttons {
+                        let mut api = DataInspectorAPI::default();
+                        f(ui, &mut api);
+
+                        self.clear_timeseries = api.clear_timeseries;
+                    }
                 });
             });
         });

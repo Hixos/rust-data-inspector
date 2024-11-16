@@ -45,6 +45,11 @@ impl PlotSignal {
     pub fn data(&self) -> &Vec<f64> {
         &self.data
     }
+
+    pub fn clear(&mut self) {
+        self.time.clear();
+        self.data.clear();
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
@@ -141,6 +146,13 @@ impl PlotSignals {
         hasher.write(name.as_bytes());
         hasher.finish()
     }
+
+    pub fn clear_timeseries(&mut self) {
+        for sig in self.signals.values_mut() {
+            sig.clear();
+        }
+    }
+
 }
 
 impl PlotSignals {

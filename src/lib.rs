@@ -10,4 +10,4 @@ pub(crate) mod state;
 
 pub use rust_data_inspector_signals::*;
 
-pub use datainspector::DataInspector;
+pub use datainspector::{DataInspector, DataInspectorAPI};

@@ -2,20 +2,25 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use rand::Rng;
+use rust_data_inspector::{DataInspector, DataInspectorAPI};
+use rust_data_inspector_signals::{PlotSignalSample, PlotSignals};
 use std::f64::consts::PI;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
-use rust_data_inspector_signals::{PlotSignals,  PlotSignalSample};
+use std::time::Duration;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use rust_data_inspector::DataInspector;
+    use std::sync::atomic::AtomicBool;
 
     let mut signals = PlotSignals::default();
 
-    let start = Instant::now();
     let mut rng = rand::thread_rng();
+    let pause = Arc::new(AtomicBool::new(false));
+
     let mut add_signal = |name: &str| {
         new_signal_producer(
             &mut signals,
@@ -24,7 +29,7 @@ fn main() -> eframe::Result<()> {
             rng.gen(),
             rng.gen::<f64>() * PI * 2.0,
             rng.gen::<f32>() * 60f32 + 2f32,
-            Some(start),
+            pause.clone(),
         );
     };
 
@@ -39,7 +44,17 @@ fn main() -> eframe::Result<()> {
     add_signal("/s1");
     add_signal("/s2");
 
-    DataInspector::run_native("plotter", signals)
+    DataInspector::run_native(
+        "plotter",
+        signals,
+        Some(move |ui: &mut egui::Ui, _: &mut DataInspectorAPI| {
+            let mut p = pause.load(Relaxed);
+
+            ui.toggle_value(&mut p, "Pause");
+
+            pause.store(p, Relaxed);
+        }),
+    )
 }
 
 pub fn new_signal_producer(
@@ -49,22 +64,24 @@ pub fn new_signal_producer(
     f: f64,
     phi: f64,
     rate: f32,
-    start_time: Option<Instant>,
+    pause: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
-    let (_, mut sample_sender) = signals.add_signal(name).unwrap();
+    let (_, sample_sender) = signals.add_signal(name).unwrap();
 
     thread::spawn(move || {
         let period_ms = u64::max((1000f32 / rate) as u64, 1);
 
-        let start = start_time.unwrap_or(Instant::now());
+        let mut t = 0.0;
 
         loop {
-            let t = Instant::now() - start;
-            let t = t.as_secs_f64();
-
             let y = a * f64::sin(2f64 * PI * f * t + phi);
-
-            let res = sample_sender.send(PlotSignalSample { time: t, value: y });
+            let res = if !pause.load(Relaxed) {
+                let res = sample_sender.send(PlotSignalSample { time: t, value: y });
+                t += period_ms as f64 / 1000.0;
+                res
+            } else {
+                Ok(())
+            };
 
             if res.is_ok() {
                 thread::sleep(Duration::from_millis(period_ms))

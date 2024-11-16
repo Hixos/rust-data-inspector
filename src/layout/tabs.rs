@@ -36,6 +36,10 @@ impl Tab {
         }
     }
 
+    pub fn clear_cache(&mut self) {
+        self.cache.clear();
+    }
+
     fn ui(
         &mut self,
         ui: &mut egui::Ui,
@@ -79,6 +83,10 @@ impl Tab {
                 for (id, signal) in signals.signals().get_signals() {
                     if let Some(sig_state) = state.signal_state.get(id) {
                         if sig_state.used_by_tile.contains(&self.pane_id) {
+                            // if signals.signals().invalidated() {
+                            //     self.cache.remove(id);
+                            // }
+
                             let range = Self::find_visible_range(
                                 signal,
                                 &plot_ui.plot_bounds(),

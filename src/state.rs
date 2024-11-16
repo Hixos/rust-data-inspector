@@ -1,11 +1,11 @@
 use std::collections::{BTreeSet, HashMap};
 
+use crate::utils::downsampling::DownsamplingMethod;
 use eframe::Storage;
 use egui::Color32;
 use egui_dock::DockState;
 use rust_data_inspector_signals::{PlotSignalID, PlotSignals};
 use serde::{Deserialize, Serialize};
-use crate::utils::downsampling::DownsamplingMethod;
 
 use crate::{
     layout::tabs::Tab,
@@ -151,6 +151,10 @@ impl SignalData {
 
     pub fn signals(&self) -> &PlotSignals {
         &self.signals
+    }
+    
+    pub fn signals_mut(&mut self) -> &mut PlotSignals {
+        &mut self.signals
     }
 
     pub fn signal_tree(&self) -> &VecTree<SignalNode> {
