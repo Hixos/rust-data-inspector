@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{channel, Receiver, SendError, Sender};
 
 use regex::Regex;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub struct PlotSignal {
@@ -86,9 +86,9 @@ impl PlotSignals {
     ///   
     /// Valid signal names must start with `/`, and may be divided in many parts separated by additional `/`s, just like unix paths.  
     /// No two consecutive `/`s may be present. Each part may only include letters, numbers and underscores '_'.
-    /// 
+    ///
     /// It is illegal for a signal to be a sub-signal of a previously added one.
-    /// 
+    ///
     /// ## Examples:
     /// - `/status`  
     /// - `/drone/sensors/accel/x`  
@@ -97,7 +97,10 @@ impl PlotSignals {
     /// - `drone/sensors/press1` Error: Does not start with `/`  
     /// - `/drone/sensors/temp-bat` Error: illegal character `-`  
     /// - `/drone/sensors//current` Error: consecutive `/`  
-    pub fn add_signal(&mut self, name: &str) -> Result<(PlotSignalID, PlotSampleSender), PlotSignalError> {
+    pub fn add_signal(
+        &mut self,
+        name: &str,
+    ) -> Result<(PlotSignalID, PlotSampleSender), PlotSignalError> {
         self.validate_name(name)?;
 
         let id = PlotSignalID {
@@ -110,7 +113,8 @@ impl PlotSignals {
             panic!("Signal ID hash collision");
         }
 
-        self.signals.insert(id, PlotSignal::new(name.to_string(), id));
+        self.signals
+            .insert(id, PlotSignal::new(name.to_string(), id));
         self.receivers.insert(id, receiver);
 
         Ok((id, PlotSampleSender { sender, id }))
@@ -121,7 +125,7 @@ impl PlotSignals {
             let receiver = self.receivers.get(id).unwrap();
 
             while let Ok(sample) = receiver.try_recv() {
-                if let Some(&last) = signal.time.last()  {
+                if let Some(&last) = signal.time.last() {
                     if sample.time < last {
                         panic!("Received sample in the past!");
                     }
@@ -160,25 +164,27 @@ impl PlotSignals {
         if !regex.is_match(name) {
             return Err(PlotSignalError::NameError {
                 name: name.to_string(),
-                msg: "Signal name must contain only letters, numbers, underscore or `/`.".to_string(),
+                msg: "Signal name must contain only letters, numbers, underscore or `/`."
+                    .to_string(),
             });
         }
 
-        // Check that the signal name is not a subpath of an existing signal
         for sig_name in self.signals.values().map(|sig| &sig.name) {
-            if name.starts_with(sig_name) {
+            let is_subsignal = sig_name
+                .split("/")
+                .zip(name.split("/"))
+                .all(|(a, b)| a == b);
+
+            if is_subsignal {
                 return Err(PlotSignalError::NameError {
                     name: name.to_string(),
-                    msg: format!(
-                        "Provided signal name is a subsignal of {sig_name}"
-                    )
-                    .to_string(),
+                    msg: format!("Provided signal name is a subsignal of {sig_name}").to_string(),
                 });
             }
         }
 
         Ok(())
-    } 
+    }
 }
 
 #[derive(Debug, Error)]
@@ -206,7 +212,10 @@ pub struct PlotSampleSender {
 }
 
 impl PlotSampleSender {
-    pub fn send(&self, sample: PlotSignalSample) -> Result<(), PlotSignalSendError<PlotSignalSample>> {
+    pub fn send(
+        &self,
+        sample: PlotSignalSample,
+    ) -> Result<(), PlotSignalSendError<PlotSignalSample>> {
         self.sender.send(sample).map_err(|e| e.into())
     }
 
