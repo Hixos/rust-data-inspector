@@ -102,6 +102,7 @@ impl eframe::App for DataInspector {
                         }
                     });
                     ui.menu_button("Options", |ui| {
+                        ui.checkbox(&mut self.state.show_debug_info, "Show debug info");
                         ui.menu_button("Downsampling Mode", |ui| {
                             ui.selectable_value(
                                 &mut self.state.downsample_mode,
@@ -129,17 +130,19 @@ impl eframe::App for DataInspector {
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             SignalListUI::new().ui(ui, &self.signals, &mut self.state);
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                egui::warn_if_debug_build(ui);
-                self.frame_history.ui(ui);
-                ui.label(format!("FPS: {}", self.frame_history.fps()));
+            if (self.state.show_debug_info) {
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                    // egui::warn_if_debug_build(ui);
+                    self.frame_history.ui(ui);
+                    ui.label(format!("FPS: {}", self.frame_history.fps()));
 
-                ui.label(format!(
-                    "All signals active: {}",
-                    self.signals.all_signals_have_data
-                ));
-                ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
-            });
+                    ui.label(format!(
+                        "All signals active: {}",
+                        self.signals.all_signals_have_data
+                    ));
+                    ui.label(format!("Signal bounds: {:?}", self.signals.time_span()));
+                });
+            }
         });
 
         egui::CentralPanel::default()

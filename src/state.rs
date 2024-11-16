@@ -14,6 +14,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataInspectorState {
+    pub show_debug_info: bool,
     pub x_axis_mode: XAxisMode,
     pub link_x: bool,
     pub downsample_mode: DownsamplingMethod,
@@ -30,6 +31,7 @@ pub struct DataInspectorState {
 impl DataInspectorState {
     pub fn new(signals: &PlotSignals) -> Self {
         DataInspectorState {
+            show_debug_info: false,
             x_axis_mode: XAxisMode::default(),
             link_x: true,
             downsample_mode: DownsamplingMethod::Lttb,
