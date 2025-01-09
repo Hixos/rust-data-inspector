@@ -64,11 +64,11 @@ impl Tab {
             .allow_zoom(false)
             .allow_scroll(false)
             .allow_double_click_reset(false)
-            .link_cursor("main", true, false)
+            .link_cursor("main", Vec2b::new(true, false))
             .link_axis(
                 "main",
-                state.link_x && state.x_axis_mode != XAxisMode::Fit,
-                false,
+                Vec2b::new(state.link_x && state.x_axis_mode != XAxisMode::Fit,
+                false),
             )
             .auto_bounds(Vec2b::FALSE)
             .legend(Legend::default())

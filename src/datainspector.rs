@@ -40,13 +40,13 @@ impl DataInspector {
             app_name,
             NativeOptions::default(),
             Box::new(|cc| {
-                Box::new(DataInspector::run(
+                Ok(Box::new(DataInspector::run(
                     cc,
                     signals,
                     custom_buttons.map(|f| -> Box<dyn FnMut(&mut egui::Ui, &mut DataInspectorAPI)> {
                         Box::new(f)
                     }),
-                ))
+                )))
             }),
         )
     }
